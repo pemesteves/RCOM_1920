@@ -20,9 +20,21 @@
 
 volatile int STOP=FALSE;
 
+//int flag=1;
+
+/*
+ * Signal Handler for SIGALRM
+ */
+/*void atende()                   // atende alarme
+{
+  printf("alarme # %d\n", conta);
+  flag=1;
+}*/
+
 int main(int argc, char** argv)
 {
-    
+    //(void) signal(SIGALRM, atende);  // instala  rotina que atende interrupcao
+
     int fd,c, res;
     struct termios oldtio,newtio;
     char buf[255];
@@ -75,33 +87,53 @@ int main(int argc, char** argv)
     SET[2] = C_SET;
     SET[3] = SET[1]^SET[2]; //BCC
     SET[4] = FLAG;
-
-    printf("%x\n", C_SET);
     
     if(write(fd, SET, 5) < 0){
       perror("write");
       exit(-1);
     }
 
-    /*i = 0;
-    memset(buf, '\0', strlen(buf));
+    memset(SET, '\0', sizeof(SET));
 
-    while (STOP==FALSE)
-    {
-      res = read(fd,&buf[i],1);
-      if (buf[i]=='\0')  STOP=TRUE;
-      i++;
+    int state = 0;
+    while (state != 5) {       /* loop for input */
+      read(fd, &SET[state], 1);   /* returns after 5 chars have been input */
+      switch (state) {
+        case 0:
+          if (SET[state]==FLAG) state = 1;
+          break;
+        case 1:
+          if (SET[state]==A) state = 2;
+          else if (SET[state]==FLAG) state = 1;
+          else state = 0;
+          break;
+        case 2:
+          if (SET[state]==C_SET) state = 3;
+          else if (SET[state]==FLAG) state = 1;
+          else state = 0;
+          break;
+        case 3:
+          if (SET[state]==C_SET^A) state = 4;
+          else state = 0;
+          break;
+        case 4:
+          if (SET[state]==FLAG) state = 5;
+          else state = 0;
+          break;
+        default:
+          break;
+      }
     }
 
-    printf("String: %s; Length: %d\n", buf, strlen(buf));*/
+  printf("%x %x %x %x %x\n", SET[0], SET[1], SET[2], SET[3], SET[4]);
 
 
-    if ( tcsetattr(fd,TCSANOW,&newtio) == -1) {
-      perror("tcsetattr");
-      exit(-1);
-    }
-    printf("New termios structure set\n");
-    
-    close(fd);
-    return 0;
+  if ( tcsetattr(fd,TCSANOW,&newtio) == -1) {
+    perror("tcsetattr");
+    exit(-1);
+  }
+  printf("New termios structure set\n");
+  
+  close(fd);
+  return 0;
 }
