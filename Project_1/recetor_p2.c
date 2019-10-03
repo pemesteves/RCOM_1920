@@ -16,7 +16,7 @@
 
 #define FLAG 0x7e
 #define A 0x03
-#define SET 0x03
+#define C_SET 0x03
 
 volatile int STOP=FALSE;
 
@@ -24,7 +24,7 @@ int main(int argc, char** argv)
 {
   int fd, res;
   struct termios oldtio,newtio;
-  char buf[255];
+  char buf[5];
 
   if ( (argc < 2) ||
       ((strcmp("/dev/ttyS0", argv[1])!=0) &&
@@ -90,12 +90,12 @@ int main(int argc, char** argv)
         else state = 0;
         break;
       case 2:
-        if (buf[state]==SET) state = 3;
+        if (buf[state]==C_SET) state = 3;
         else if (buf[state]==FLAG) state = 1;
         else state = 0;
         break;
       case 3:
-        if (buf[state]==SET^A) state = 4;
+        if (buf[state]==C_SET^A) state = 4;
         else state = 0;
         break;
       case 4:
@@ -108,14 +108,13 @@ int main(int argc, char** argv)
   }
 
   printf("%x %x %x %x %x\n", buf[0], buf[1], buf[2], buf[3], buf[4]);
-  printf("FUNCIONOU!\n");
 
   /*
      O ciclo WHILE deve ser alterado de modo a respeitar o indicado no gui�o
      */
 
 
-  res = write(fd, buf, strlen(buf) + 1);
+  res = write(fd, buf, 5);
   printf("%d bytes written\n", res);
 
   sleep(1);
