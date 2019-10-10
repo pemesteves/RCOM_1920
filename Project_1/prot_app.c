@@ -73,12 +73,32 @@ int llwrite(int fd, char *buffer, int length)
     return write(fd, buffer, length);
 }
 
-int llread(int fd, char *buffer)
-{
-    return 0;
+int llread(int fd, char * buffer) {
+    int flag_counter = 0, char_counter = 0;
+    
+    while(flag_counter < 2) {
+        if(read(fd, &buffer[char_counter], 1) == -1) {
+            perror("read");
+            return 1;
+        }
+
+        if(buffer[char_counter] == FLAG) {
+           flag_counter++;
+        }
+
+        char_counter++;
+    }
+
+    return char_counter;
 }
 
-int llclose(int fd)
-{
-    return 0;
+int llclose(int fd, struct termios* oldtio) {
+    if (tcsetattr(fd,TCSANOW, &oldtio) == -1) {
+        perror("tcsetattr");
+        return 1;
+    }
+    
+    printf("New termios structure set\n");
+  
+    close(fd);
 }
