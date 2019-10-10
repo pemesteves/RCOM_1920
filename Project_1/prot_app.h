@@ -1,7 +1,7 @@
+#include <termios.h>
+
 #define TRANSMITTER 0
 #define RECEIVER 1
-
-#include <termios.h>
 
 int llopen(int porta, int flag, struct termios *oldtio);
 

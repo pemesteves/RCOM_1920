@@ -1,4 +1,5 @@
 #include "prot_app.h"
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -12,10 +13,9 @@ int llopen(char* gate, int flag, struct termios *oldtio)
     if (flag != TRANSMITTER && flag != RECEIVER)
         return -1;
 
-    int fd, c, res;
+    int fd;
     struct termios newtio;
     char buf[255];
-    int i, sum = 0, speed = 0;
 
     if ((strcmp("/dev/ttyS0", gate) != 0) && (strcmp("/dev/ttyS1", gate) != 0)))
     {
@@ -37,7 +37,7 @@ int llopen(char* gate, int flag, struct termios *oldtio)
     if (tcgetattr(fd, oldtio) == -1)
     { /* save current port settings */
         perror("tcgetattr");
-        exit(-1);
+        return -1;
     }
 
     bzero(&newtio, sizeof(newtio));
@@ -62,16 +62,15 @@ int llopen(char* gate, int flag, struct termios *oldtio)
     if (tcsetattr(fd, TCSANOW, &newtio) == -1)
     {
         perror("tcsetattr");
-        exit(-1);
+        return -1;
     }
-    printf("New termios structure set\n");
 
-    return -1;
+    return fd;
 }
 
 int llwrite(int fd, char *buffer, int length)
 {
-    return 0;
+    return write(fd, buffer, length);
 }
 
 int llread(int fd, char *buffer)
