@@ -1,8 +1,9 @@
-
 #define TRANSMITTER 0
 #define RECEIVER 1
 
-int llopen(int porta, int flag);
+#include <termios.h>
+
+int llopen(int porta, int flag, struct termios *oldtio);
 
 int llwrite(int fd, char * buffer, int length);
 
