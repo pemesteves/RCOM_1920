@@ -14,9 +14,10 @@
 #define FALSE 0
 #define TRUE 1
 
-#define FLAG 0x7e
-#define A 0x03
-#define C_SET 0x03
+#define FLAG    0x7e
+#define A       0x03
+#define C_SET   0x03
+#define C_UA    0x07
 
 int alarm_flag = 1, counter = 1;
 
@@ -40,7 +41,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
     struct termios newtio;
     char buf[255];
 
-    if ((strcmp("/dev/ttyS0", gate) != 0) && (strcmp("/dev/ttyS1", gate) != 0))
+    if ((strcmp("/dev/ttyS0", gate) != 0) && (strcmp("/dev/ttyS1", gate) != 0) && (strcmp("/dev/ttyS2", gate) != 0))    //S2 para teste em VB
         {
             printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
             return -1;
@@ -91,6 +92,8 @@ int llopen(char *gate, int flag, struct termios *oldtio)
         return -1;
     }
 
+    printf("New termios structure set at llopen\n");
+
     int state = 0;
     if (flag == TRANSMITTER)
     {
@@ -111,11 +114,16 @@ int llopen(char *gate, int flag, struct termios *oldtio)
             SET[3] = SET[1] ^ SET[2]; //BCC
             SET[4] = FLAG;
 
-            if (write(fd, SET, 5) < 0)
+            int size_written;
+
+            if ((size_written = write(fd, SET, 5)) < 0)
             {
                 perror("write");
                 exit(-1);
             }
+
+            printf("%d bytes written: ", size_written);
+            printf("%x %x %x %x %x\n", SET[0], SET[1], SET[2], SET[3], SET[4]);
 
             memset(SET, '\0', sizeof(SET));
 
@@ -143,7 +151,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
                         state = 0;
                     break;
                 case 2:
-                    if (SET[state] == C_SET)
+                    if (SET[state] == C_UA)
                         state = 3;
                     else if (SET[state] == FLAG)
                         state = 1;
@@ -151,7 +159,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
                         state = 0;
                     break;
                 case 3:
-                    if (SET[state] == C_SET ^ A)
+                    if (SET[state] == C_UA ^ A)
                         state = 4;
                     else
                         state = 0;
@@ -212,9 +220,18 @@ int llopen(char *gate, int flag, struct termios *oldtio)
             }
         }
 
+        unsigned char SET[5];
+
+        SET[0] = FLAG;
+        SET[1] = A;
+        SET[2] = C_UA;
+        SET[3] = SET[1] ^ SET[2]; //BCC
+        SET[4] = FLAG;
+
 		
-  		int res = write(fd, buf, 5);
-  		printf("%d bytes written\n", res);
+  		int size_written = write(fd, SET, 5);
+  		printf("%d bytes written: ", size_written);
+        printf("%x %x %x %x %x\n", SET[0], SET[1], SET[2], SET[3], SET[4]);
     }
 
     if(flag == TRANSMITTER){
@@ -260,7 +277,7 @@ int llclose(int fd, struct termios *oldtio)
         return 1;
     }
 
-    printf("New termios structure set\n");
+    printf("Old termios structure set at llclose\n");
 
     close(fd);
 }
