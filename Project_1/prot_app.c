@@ -8,11 +8,17 @@
 #include <stdlib.h>
 #include <signal.h>
 
+#define BAUDRATE B38400
+#define MODEMDEVICE "/dev/ttyS1"
+#define _POSIX_SOURCE 1 /* POSIX compliant source */
+#define FALSE 0
+#define TRUE 1
+
 #define FLAG 0x7e
 #define A 0x03
 #define C_SET 0x03
 
-int flag = 1, counter = 1;
+int alarm_flag = 1, counter = 1;
 
 /*
  * Signal Handler for SIGALRM
@@ -21,11 +27,10 @@ void atende(int signal);
 
 int llopen(char *gate, int flag, struct termios *oldtio)
 {
-
     if (flag != TRANSMITTER && flag != RECEIVER)
         return -1;
 
-    sighandler_t sigalrm_handler;
+	void* sigalrm_handler;
 
     if(flag == TRANSMITTER){
         sigalrm_handler = signal(SIGALRM, atende);  // instala  rotina que atende interrupcao
@@ -35,7 +40,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
     struct termios newtio;
     char buf[255];
 
-    if ((strcmp("/dev/ttyS0", gate) != 0) && (strcmp("/dev/ttyS1", gate) != 0)))
+    if ((strcmp("/dev/ttyS0", gate) != 0) && (strcmp("/dev/ttyS1", gate) != 0))
         {
             printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
             return -1;
@@ -46,6 +51,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
     because we don't want to get killed if linenoise sends CTRL-C.
     */
     fd = open(gate, O_RDWR | O_NOCTTY);
+
     if (fd < 0)
     {
         perror(gate);
@@ -93,10 +99,10 @@ int llopen(char *gate, int flag, struct termios *oldtio)
         while (counter < 4 && state < 5)
         {
             printf("Transmission number %d\n", counter);
-            if (flag)
+            if (alarm_flag)
             {
                 alarm(newtio.c_cc[VTIME]);
-                flag = 0;
+                alarm_flag = 0;
             }
 
             SET[0] = FLAG;
@@ -116,7 +122,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
             state = 0;
             while (state != 5) /* loop for input */
             { 
-                if (flag == 1)
+                if (alarm_flag == 1)
                 {
                     printf("Receiving error at retransmission number %d\n", counter - 1);
                     break;
@@ -205,6 +211,10 @@ int llopen(char *gate, int flag, struct termios *oldtio)
                 break;
             }
         }
+
+		
+  		int res = write(fd, buf, 5);
+  		printf("%d bytes written\n", res);
     }
 
     if(flag == TRANSMITTER){
@@ -258,6 +268,6 @@ int llclose(int fd, struct termios *oldtio)
 void atende(int signal)
 {
     printf("alarme # %d\n", counter);
-    flag = 1;
+    alarm_flag = 1;
     counter++;
 }
