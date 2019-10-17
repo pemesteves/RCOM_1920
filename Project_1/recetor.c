@@ -9,7 +9,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "prot_app.h"
+#include "link_layer.h"
 
 #define BAUDRATE B38400
 #define _POSIX_SOURCE 1 /* POSIX compliant source */

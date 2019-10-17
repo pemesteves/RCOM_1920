@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <signal.h>
 
-#include "prot_app.h"
+#include "link_layer.h"
 
 #define MODEMDEVICE "/dev/ttyS1"
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
