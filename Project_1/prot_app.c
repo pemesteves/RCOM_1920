@@ -18,6 +18,7 @@
 #define A       0x03
 #define C_SET   0x03
 #define C_UA    0x07
+#define C_RR    0x05
 
 int alarm_flag = 1, counter = 1;
 
@@ -220,18 +221,18 @@ int llopen(char *gate, int flag, struct termios *oldtio)
             }
         }
 
-        unsigned char SET[5];
+        unsigned char UA[5];
 
-        SET[0] = FLAG;
-        SET[1] = A;
-        SET[2] = C_UA;
-        SET[3] = SET[1] ^ SET[2]; //BCC
-        SET[4] = FLAG;
+        UA[0] = FLAG;
+        UA[1] = A;
+        UA[2] = C_UA;
+        UA[3] = UA[1] ^ UA[2]; //BCC
+        UA[4] = FLAG;
 
 		
-  		int size_written = write(fd, SET, 5);
+  		int size_written = write(fd, UA, 5);
   		printf("%d bytes written: ", size_written);
-        printf("%x %x %x %x %x\n", SET[0], SET[1], SET[2], SET[3], SET[4]);
+        printf("%x %x %x %x %x\n", UA[0], UA[1], UA[2], UA[3], UA[4]);
     }
 
     if(flag == TRANSMITTER){
@@ -248,25 +249,106 @@ int llwrite(int fd, char *buffer, int length)
 
 int llread(int fd, char *buffer)
 {
-    int flag_counter = 0, char_counter = 0;
+    printf("\nStarting llread\n");
 
-    while (flag_counter < 2)
-    {
-        if (read(fd, &buffer[char_counter], 1) == -1)
+    unsigned char data[128];
+    unsigned char buffer_aux[128];
+
+    int state = 0;
+    int count = 0;
+    int save_state = 0;
+    while (state != -1)
+    {                             /* loop for input */
+        int num = read(fd, &buffer_aux[state], 1); /* returns after 5 chars have been input */
+
+        //printf("buffer: %x\nstate: %d\n\n", buffer_aux[state], state);
+        switch (state)
         {
-            perror("read");
-            return 1;
-        }
+        case 0:
+            if (buffer_aux[state] == FLAG) {
+                state = 1;
+            }
+            break;
+        case 1:
+            if (buffer_aux[state] == A)
+                state = 2;
+            else if (buffer_aux[state] == FLAG)
+                state = 1;
+            else
+                state = 0;
+            break;
+        case 2:
 
-        if (buffer[char_counter] == FLAG)
-        {
-            flag_counter++;
-        }
+            if (buffer_aux[state] == 0x00) { //temporary
+                state = 3;
+            }
+            else if (buffer_aux[state] == FLAG)
+            {
+                state = 1;
+            }
+            else
+            {
+                state = 0;
+            }
+            break;
+        case 3:
+            if (buffer_aux[state] == A ^ 0x00)  {//temporary
+                state = 4;
+            }
+            else
+            {
+                state = 0;
+            }
+            break;
 
-        char_counter++;
+        default:
+            if(buffer_aux[state] == FLAG){
+                state = -1;
+                break;
+            }                    
+            data[count] = buffer_aux[state];
+
+            state++;
+            count++;
+
+            save_state = state;
+
+            break;
+        }
     }
 
-    return char_counter;
+    printf("Received 'plot I'\n");
+
+    unsigned char BCC2 = 0;
+
+    for(unsigned int i = 4; i < save_state - 1; i++) {
+        BCC2 ^= buffer_aux[i];
+    }
+
+    //printf("\nBCC2: %x\n", BCC2);
+    //printf("Save state: %d\n", save_state);
+
+    if (buffer_aux[save_state - 1] != BCC2)
+        return -1;
+
+    data[save_state -1] = '/0';
+    strcpy(buffer, data);
+
+
+
+    unsigned char RR[5];
+
+    RR[0] = FLAG;
+    RR[1] = A;
+    RR[2] = C_RR;   //NEED TO CHANGE -> C_RR1, C_RR0
+    RR[3] = RR[1] ^ RR[2]; //BCC
+    RR[4] = FLAG;
+
+    
+    int size_written = write(fd, RR, 5);
+    printf("%d bytes written: ", size_written);
+    printf("%x %x %x %x %x\n", RR[0], RR[1], RR[2], RR[3], RR[4]);
+
 }
 
 int llclose(int fd, struct termios *oldtio)
@@ -277,7 +359,7 @@ int llclose(int fd, struct termios *oldtio)
         return 1;
     }
 
-    printf("Old termios structure set at llclose\n");
+    printf("\nOld termios structure set at llclose\n");
 
     close(fd);
 }

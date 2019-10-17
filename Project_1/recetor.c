@@ -35,6 +35,13 @@ int main(int argc, char** argv)
   if((fd = llopen(argv[1], RECEIVER, &oldtio)) < 0)
     printf("Error in llopen");
 
+
+  char data[128];
+  if(llread(fd, &data) < 0)
+    printf("Error in llread");
+
+  sleep(2);
+
   if(llclose(fd,& oldtio))
 		printf("llclose error\n");
 
