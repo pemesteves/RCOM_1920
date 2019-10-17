@@ -176,6 +176,11 @@ int llopen(char *gate, int flag, struct termios *oldtio)
                 }
             }
         }
+	   
+	if(counter >= 4){
+            write(stderr, "Can't open protocol\n", 21);
+	    return -1;
+        }
     }
     else
     {
@@ -236,6 +241,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
     }
 
     if(flag == TRANSMITTER){
+          alarm(0);
         (void) signal(SIGALRM, sigalrm_handler);
     }
 
@@ -243,8 +249,106 @@ int llopen(char *gate, int flag, struct termios *oldtio)
 }
 
 int llwrite(int fd, char *buffer, int length)
-{
-    return write(fd, buffer, length);
+{if(length <= 0){
+      write(stderr, "Length must be positive!\n", 26);
+      return -1;
+    }
+
+    unsigned char* I = malloc(6*sizeof(char)+length*sizeof(char)); //[FLAG, A, C_SET, BCC1, [DADOS], BCC2, FLAG]
+
+  /*  while (counter < 4 && state < 5)
+    {
+        printf("Transmission number %d\n", counter);
+        if (alarm_flag)
+        {
+            alarm(newtio.c_cc[VTIME]);
+            alarm_flag = 0;
+        }
+*/
+        I[0] = FLAG;
+        I[1] = A;
+        I[2] = 0x00;//C_SET;
+        I[3] = I[1] ^ I[2]; //BCC1
+
+        char BCC2 = 0;
+        int i_index = 4;
+        for(int i = 0; i < length; i++){ //I think this can be changed -> strcpy
+            I[i_index] = buffer[i];
+            BCC2 ^= buffer[i];
+            i_index++;
+        }
+        I[i_index] = BCC2;
+        i_index++;
+        I[i_index] = FLAG;
+
+        int size_written;
+
+        if ((size_written = write(fd, I, length+6)) < 0)
+        {
+            perror("write");
+            return -1;
+        }
+
+        printf("%d bytes written. ", size_written);
+
+        for(int i = 0; i < length+6; i++){
+            printf("%c ", I[i]);
+        }
+
+        free(I);
+
+        unsigned char RR[5];
+
+        int state = 0;
+
+        while (state != 5) /* loop for input */
+        {
+            if (alarm_flag == 1)
+            {
+                printf("Receiving error at retransmission number %d\n", counter - 1);
+                break;
+            }
+            read(fd, &RR[state], 1); /* returns after 5 chars have been input */
+            switch (state)
+            {
+            case 0:
+                if (RR[state] == FLAG)
+                    state = 1;
+                break;
+            case 1:
+                if (RR[state] == A)
+                    state = 2;
+                else if (RR[state] == FLAG)
+                    state = 1;
+                else
+                    state = 0;
+                break;
+            case 2:
+                if (RR[state] == C_RR)
+                    state = 3;
+                else if (RR[state] == FLAG)
+                    state = 1;
+                else
+                    state = 0;
+                break;
+            case 3:
+                if (RR[state] == C_RR ^ A)
+                    state = 4;
+                else
+                    state = 0;
+                break;
+            case 4:
+                if (RR[state] == FLAG)
+                    state = 5;
+                else
+                    state = 0;
+                break;
+            default:
+                break;
+            }
+        }
+
+    return size_written;
 }
 
 int llread(int fd, char *buffer)
