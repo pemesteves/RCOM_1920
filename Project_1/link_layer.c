@@ -266,14 +266,15 @@ int llopen(char *gate, int flag, struct termios *oldtio)
 
 int llwrite(int fd, char *buffer, int length)
 {
-    if(length <= 0){
-      write(stderr, "Length must be positive!\n", 26);
-      return -1;
+    if (length <= 0)
+    {
+        write(stderr, "Length must be positive!\n", 26);
+        return -1;
     }
+    printf("Sender: %x; receiver: %x\n", sender_field, receiver_field);
+    unsigned char *I = malloc(6 * sizeof(char) + length * sizeof(char)); //[FLAG, A, C_SET, BCC1, [DADOS], BCC2, FLAG]
 
-    unsigned char* I = malloc(6*sizeof(char)+length*sizeof(char)); //[FLAG, A, C_SET, BCC1, [DADOS], BCC2, FLAG]
-
-  /*  while (counter < 4 && state < 5)
+    /*  while (counter < 4 && state < 5)
     {
         printf("Transmission number %d\n", counter);
         if (alarm_flag)
@@ -281,38 +282,36 @@ int llwrite(int fd, char *buffer, int length)
             alarm(newtio.c_cc[VTIME]);
             alarm_flag = 0;
         }
-  */
-        I[0] = FLAG;
-        I[1] = A;
-        I[2] = 0x00;//C_SET;
-        I[3] = I[1] ^ I[2]; //BCC1
+*/
+    I[0] = FLAG;
+    I[1] = A;
+    I[2] = sender_field; //C_SET;
+    I[3] = I[1] ^ I[2];  //BCC1
 
-        char BCC2 = 0;
-        int i_index = 4;
-        for(int i = 0; i < length; i++){ //I think this can be changed -> strcpy
-            I[i_index] = buffer[i];
-            BCC2 ^= buffer[i];
-            i_index++;
-        }
-        I[i_index] = BCC2;
+    unsigned char BCC2 = 0;
+    int i_index = 4;
+    for (int i = 0; i < length; i++) //I think this can be changed -> strcpy
+    {
+        I[i_index] = buffer[i];
+        BCC2 ^= buffer[i];
         i_index++;
-        I[i_index] = FLAG;
+    }
+    I[i_index] = BCC2;
+    i_index++;
+    I[i_index] = FLAG;
 
-        int size_written;
+    int size_written;
+    unsigned char received_char;
+    do{
+        received_char = 0xFF;
 
-        if ((size_written = write(fd, I, length+6)) < 0)
+        if ((size_written = write(fd, I, length + 6)) < 0)
         {
             perror("write");
             return -1;
         }
 
-        printf("%d bytes written. ", size_written);
-
-        for(int i = 0; i < length+6; i++){
-            printf("%c ", I[i]);
-        }
-
-        free(I);
+        printf("%d bytes written.\n", size_written);
 
         unsigned char RR[5];
 
@@ -341,15 +340,19 @@ int llwrite(int fd, char *buffer, int length)
                     state = 0;
                 break;
             case 2:
-                if (RR[state] == C_RR)
+                if (RR[state] == receiver_field){
+                    received_char = receiver_field;
+
                     state = 3;
+                }
                 else if (RR[state] == FLAG)
                     state = 1;
-                else
-                    state = 0;
+                else{ //Error in transmission: receiver asked for the same plot
+                    state = 3;
+                }
                 break;
             case 3:
-                if (RR[state] == C_RR ^ A)
+                if (RR[state] == received_char ^ A)
                     state = 4;
                 else
                     state = 0;
@@ -364,6 +367,13 @@ int llwrite(int fd, char *buffer, int length)
                 break;
             }
         }
+    }while(received_char != receiver_field);
+
+    free(I);
+    
+    update_transm_nums();
+
+    printf("Received RR\n");
 
     return size_written;
 }
