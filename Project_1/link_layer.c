@@ -14,18 +14,34 @@
 #define FALSE 0
 #define TRUE 1
 
-#define FLAG    0x7e
-#define A       0x03
-#define C_SET   0x03
-#define C_UA    0x07
-#define C_RR    0x05
+#define FLAG        0x7e
+#define A           0x03
+#define C_SET       0x03
+#define C_UA        0x07
+#define C_RR        0x05
+#define C_SEND_0    0x00
+#define C_SEND_1    0x40
+#define C_RR_0      0x05
+#define C_RR_1      0x85
+#define C_REJ_0     0x01
+#define C_REJ_1     0x81
 
 int alarm_flag = 1, counter = 1;
 
-/*
+unsigned char sender_field = C_SEND_0;
+unsigned char receiver_field = C_RR_1;
+
+int information_plot_counter = 1;
+
+/**
  * Signal Handler for SIGALRM
  */
 void atende(int signal);
+
+/**
+ * Update sender and receiver numbers
+ */
+void update_transm_nums();
 
 int llopen(char *gate, int flag, struct termios *oldtio)
 {
@@ -249,7 +265,8 @@ int llopen(char *gate, int flag, struct termios *oldtio)
 }
 
 int llwrite(int fd, char *buffer, int length)
-{if(length <= 0){
+{
+    if(length <= 0){
       write(stderr, "Length must be positive!\n", 26);
       return -1;
     }
@@ -264,7 +281,7 @@ int llwrite(int fd, char *buffer, int length)
             alarm(newtio.c_cc[VTIME]);
             alarm_flag = 0;
         }
-*/
+  */
         I[0] = FLAG;
         I[1] = A;
         I[2] = 0x00;//C_SET;
@@ -354,18 +371,24 @@ int llwrite(int fd, char *buffer, int length)
 int llread(int fd, char *buffer)
 {
     printf("\nStarting llread\n");
+    printf("Information plot %d\n\n", information_plot_counter);
+    information_plot_counter++;
 
-    unsigned char data[128];
     unsigned char buffer_aux[128];
 
     int state = 0;
-    int count = 0;
-    int save_state = 0;
+    int data_index= 0;
+    int last_state = 0;
+
+    printf("SENDER_FIELD: %x\n", sender_field);
+    printf("RECEIVER_FIELD: %x\n", receiver_field);
+
     while (state != -1)
     {                             /* loop for input */
         int num = read(fd, &buffer_aux[state], 1); /* returns after 5 chars have been input */
 
         //printf("buffer: %x\nstate: %d\n\n", buffer_aux[state], state);
+
         switch (state)
         {
         case 0:
@@ -374,16 +397,16 @@ int llread(int fd, char *buffer)
             }
             break;
         case 1:
-            if (buffer_aux[state] == A)
+            if (buffer_aux[state] == A) {
                 state = 2;
+            }
             else if (buffer_aux[state] == FLAG)
                 state = 1;
             else
                 state = 0;
             break;
         case 2:
-
-            if (buffer_aux[state] == 0x00) { //temporary
+            if (buffer_aux[state] == sender_field) {
                 state = 3;
             }
             else if (buffer_aux[state] == FLAG)
@@ -396,7 +419,7 @@ int llread(int fd, char *buffer)
             }
             break;
         case 3:
-            if (buffer_aux[state] == A ^ 0x00)  {//temporary
+            if (buffer_aux[state] == A ^ sender_field)  {
                 state = 4;
             }
             else
@@ -410,12 +433,12 @@ int llread(int fd, char *buffer)
                 state = -1;
                 break;
             }                    
-            data[count] = buffer_aux[state];
+            buffer[data_index] = buffer_aux[state];
 
             state++;
-            count++;
+            data_index++;
 
-            save_state = state;
+            last_state = state;
 
             break;
         }
@@ -425,31 +448,30 @@ int llread(int fd, char *buffer)
 
     unsigned char BCC2 = 0;
 
-    for(unsigned int i = 4; i < save_state - 1; i++) {
+    // Constructs the BCC2
+    for(unsigned int i = 4; i < last_state - 1; i++) {
         BCC2 ^= buffer_aux[i];
     }
 
-    //printf("\nBCC2: %x\n", BCC2);
-    //printf("Save state: %d\n", save_state);
-
-    if (buffer_aux[save_state - 1] != BCC2)
+    // Checks if the BCC2 is correct
+    if (buffer_aux[last_state - 1] != BCC2)
         return -1;
 
-    data[save_state -1] = '/0';
-    strcpy(buffer, data);
-
-
+    // Sets the end of the data string
+    buffer[data_index-1] = '\0';
 
     unsigned char RR[5];
 
     RR[0] = FLAG;
     RR[1] = A;
-    RR[2] = C_RR;   //NEED TO CHANGE -> C_RR1, C_RR0
+    RR[2] = receiver_field;
     RR[3] = RR[1] ^ RR[2]; //BCC
     RR[4] = FLAG;
-
     
     int size_written = write(fd, RR, 5);
+
+    update_transm_nums();
+
     printf("%d bytes written: ", size_written);
     printf("%x %x %x %x %x\n", RR[0], RR[1], RR[2], RR[3], RR[4]);
 
@@ -473,4 +495,16 @@ void atende(int signal)
     printf("alarme # %d\n", counter);
     alarm_flag = 1;
     counter++;
+}
+
+void update_transm_nums() {
+    if(sender_field == C_SEND_0) {
+        sender_field = C_SEND_1;
+        receiver_field = C_RR_0;
+    }
+    else
+    {
+        sender_field = C_SEND_0;
+        receiver_field = C_RR_1;
+    }   
 }

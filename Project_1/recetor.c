@@ -36,11 +36,18 @@ int main(int argc, char** argv)
     printf("Error in llopen");
     return -1;
   }
+  for(int i = 0; i < 3; i++){
+    char data[128];
+    if(llread(fd, &data) < 0){
+      printf("Error in llread");
+      return -1;
+    }
 
-  char data[128];
-  if(llread(fd, &data) < 0){
-    printf("Error in llread");
-    return -1;
+    printf("Message received: ");
+    for(int i = 0; data[i] != '\0'; i++) {
+      printf("%c", data[i]);
+    }
+    printf("\n");
   }
 
   sleep(2);
