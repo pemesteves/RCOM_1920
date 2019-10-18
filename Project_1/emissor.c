@@ -37,12 +37,15 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	char data[5] = "Hello";
-	printf("%x\n", ((('H'^'e')^'l')^'l')^'o');
+	for(int i = 0; i < 3; i++){
+		unsigned char data[8];
+		sprintf(data, "Hello_%d", i);
+		printf("Message\n");
 
-  if(llwrite(fd, data, 5) < 0){
-		printf("llwrite error\n");
-		return -1;
+		if(llwrite(fd, data, 5) < 0){
+			printf("llwrite error\n");
+			return -1;
+		}
 	}
 
 	//sleep(2);
