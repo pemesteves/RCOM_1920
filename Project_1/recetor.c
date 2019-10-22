@@ -20,6 +20,9 @@ volatile int STOP=FALSE;
 
 int main(int argc, char** argv)
 {
+  int current = 0;
+  int max = 4;
+
   int fd, res;
   struct termios oldtio,newtio;
   char buf[5];
@@ -33,18 +36,20 @@ int main(int argc, char** argv)
   }
 
   if((fd = llopen(argv[1], RECEIVER, &oldtio)) < 0){
-    printf("Error in llopen");
+    printf("\nError in llopen\n");
     return -1;
   }
   for(int i = 0; i < 3; i++){
     char data[128];
-    if(llread(fd, &data) < 0){
-      printf("Error in llread");
+    int data_size = 0;
+    
+    if((data_size = llread(fd, &data)) < 0){
+      printf("\nError in llread\n");
       return -1;
     }
 
-    printf("Message received: ");
-    for(int i = 0; data[i] != '\0'; i++) {
+    printf("\nMessage received: ");
+    for(int i = 0; i < data_size; i++) {
       printf("%c", data[i]);
     }
     printf("\n");
@@ -53,7 +58,7 @@ int main(int argc, char** argv)
   sleep(2);
 
   if(llclose(fd,& oldtio)){
-		printf("llclose error\n");
+		printf("\nllclose error\n");
     return -1;
   }
 
