@@ -7,12 +7,16 @@
 #include <string.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <stdbool.h>
 
 #define BAUDRATE B38400
 #define MODEMDEVICE "/dev/ttyS1"
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
 #define TRUE 1
+
+#define MAX_REJECTS 3
+#define BIT(n) 1 << n
 
 #define FLAG        0x7e
 #define A           0x03
@@ -29,7 +33,8 @@
 int alarm_flag = 1, counter = 1;
 
 unsigned char sender_field = C_SEND_0;
-unsigned char receiver_field = C_RR_1;
+unsigned char receiver_ready_field = C_RR_1;
+unsigned char receiver_reject_field = C_REJ_1;
 
 int information_plot_counter = 1;
 
@@ -271,7 +276,6 @@ int llwrite(int fd, char *buffer, int length)
         write(stderr, "Length must be positive!\n", 26);
         return -1;
     }
-    printf("Sender: %x; receiver: %x\n", sender_field, receiver_field);
     unsigned char *I = malloc(6 * sizeof(char) + length * sizeof(char)); //[FLAG, A, C_SET, BCC1, [DADOS], BCC2, FLAG]
 
     /*  while (counter < 4 && state < 5)
@@ -340,8 +344,8 @@ int llwrite(int fd, char *buffer, int length)
                     state = 0;
                 break;
             case 2:
-                if (RR[state] == receiver_field){
-                    received_char = receiver_field;
+                if (RR[state] == receiver_ready_field){
+                    received_char = receiver_ready_field;
 
                     state = 3;
                 }
@@ -367,7 +371,7 @@ int llwrite(int fd, char *buffer, int length)
                 break;
             }
         }
-    }while(received_char != receiver_field);
+    }while(received_char != receiver_ready_field);
 
     free(I);
     
@@ -386,105 +390,143 @@ int llread(int fd, char *buffer)
 
     unsigned char buffer_aux[128];
 
-    int state = 0;
-    int data_index= 0;
-    int last_state = 0;
-
     printf("SENDER_FIELD: %x\n", sender_field);
-    printf("RECEIVER_FIELD: %x\n", receiver_field);
+    printf("RECEIVER_READY_FIELD: %x\n", receiver_ready_field);
+    printf("RECEIVER_REJECT_FIELD: %x\n", receiver_reject_field);
 
-    while (state != -1)
-    {                             /* loop for input */
-        int num = read(fd, &buffer_aux[state], 1); /* returns after 5 chars have been input */
 
-        //printf("buffer: %x\nstate: %d\n\n", buffer_aux[state], state);
+    int reject_counter = 0;
 
-        switch (state)
-        {
-        case 0:
-            if (buffer_aux[state] == FLAG) {
-                state = 1;
-            }
-            break;
-        case 1:
-            if (buffer_aux[state] == A) {
-                state = 2;
-            }
-            else if (buffer_aux[state] == FLAG)
-                state = 1;
-            else
-                state = 0;
-            break;
-        case 2:
-            if (buffer_aux[state] == sender_field) {
-                state = 3;
-            }
-            else if (buffer_aux[state] == FLAG)
+    do
+    {
+        reject_counter++;
+
+        int state = 0;
+        int data_index= 0;
+        int last_state = 0;
+
+        bool bcc1_wrong = false, bcc2_wrong = false;        
+
+        while (state != -1)
+        {                             /* loop for input */
+            int num = read(fd, &buffer_aux[state], 1); /* returns after 5 chars have been input */
+
+            //printf("buffer: %x\nstate: %d\n\n", buffer_aux[state], state);
+
+            switch (state)
             {
-                state = 1;
-            }
-            else
-            {
-                state = 0;
-            }
-            break;
-        case 3:
-            if (buffer_aux[state] == A ^ sender_field)  {
-                state = 4;
-            }
-            else
-            {
-                state = 0;
-            }
-            break;
-
-        default:
-            if(buffer_aux[state] == FLAG){
-                state = -1;
+            case 0:
+                if (buffer_aux[state] == FLAG) {
+                    state = 1;
+                }
                 break;
-            }                    
-            buffer[data_index] = buffer_aux[state];
+            case 1:
+                if (buffer_aux[state] == A) {
+                    state = 2;
+                }
+                else if (buffer_aux[state] == FLAG)
+                    state = 1;
+                else
+                    state = 0;
+                break;
+            case 2:
+                if (buffer_aux[state] == sender_field) {
+                    state = 3;
+                }
+                else if (buffer_aux[state] == FLAG)
+                {
+                    state = 1;
+                }
+                else
+                {
+                    state = 0;
+                }
+                break;
+            case 3:
+                if (buffer_aux[state] == A ^ sender_field)  {
+                    state = 4;
+                }
+                else
+                {
+                    state = -1;
+                    bcc1_wrong = true;
+                    break;
+                }
+                break;
 
-            state++;
-            data_index++;
+            default:
+                if(buffer_aux[state] == FLAG){
+                    state = -1;
+                    break;
+                }                    
+                buffer[data_index] = buffer_aux[state];
 
-            last_state = state;
+                state++;
+                data_index++;
 
-            break;
+                last_state = state;
+
+                break;
+            }
         }
-    }
 
-    printf("Received 'plot I'\n");
+        // Starts constructing the response
+        unsigned char receiver_response[5];
 
-    unsigned char BCC2 = 0;
+        receiver_response[0] = FLAG;
+        receiver_response[1] = A;
+        receiver_response[4] = FLAG;    
+        
 
-    // Constructs the BCC2
-    for(unsigned int i = 4; i < last_state - 1; i++) {
-        BCC2 ^= buffer_aux[i];
-    }
+        if(bcc1_wrong) {
+            printf("\nRejected plot, BCC1 is wrong\n\n");
+            
+            receiver_response[2] = receiver_reject_field;
+            receiver_response[3] = receiver_response[1] ^ receiver_response[2]; 
+        }
+        else {
+            // Constructs the BCC2
+            unsigned char BCC2 = 0;        
+            for(unsigned int i = 4; i < last_state - 1; i++) {
+                BCC2 ^= buffer_aux[i];
+            }
 
-    // Checks if the BCC2 is correct
-    if (buffer_aux[last_state - 1] != BCC2)
-        return -1;
+            bcc2_wrong = (buffer_aux[last_state - 1] != BCC2);
 
-    // Sets the end of the data string
-    buffer[data_index-1] = '\0';
+            // If the BCC2 is wrong, sends REJ (receiver reject), and leaves the transmission numbers intact
+            if (bcc2_wrong) 
+            {
+                printf("\nRejected plot, BCC2 is wrong\n\n");
 
-    unsigned char RR[5];
+                receiver_response[2] = receiver_reject_field;
+                receiver_response[3] = receiver_response[1] ^ receiver_response[2]; //BCC
+            }
+            // Otherwise, sends RR (receiver ready) and updates the transmission numbers
+            else 
+            {
+                printf("\nReceived 'plot I' correctly\n");
 
-    RR[0] = FLAG;
-    RR[1] = A;
-    RR[2] = receiver_field;
-    RR[3] = RR[1] ^ RR[2]; //BCC
-    RR[4] = FLAG;
-    
-    int size_written = write(fd, RR, 5);
+                receiver_response[2] = receiver_ready_field;
+                receiver_response[3] = receiver_response[1] ^ receiver_response[2]; //BCC
 
-    update_transm_nums();
+                update_transm_nums();            
+            }        
+        }
 
-    printf("%d bytes written: ", size_written);
-    printf("%x %x %x %x %x\n", RR[0], RR[1], RR[2], RR[3], RR[4]);
+        int size_written = write(fd, receiver_response, 5);
 
+        printf("%d bytes written: ", size_written);
+        printf("%x %x %x %x %x\n", receiver_response[0], receiver_response[1], receiver_response[2], receiver_response[3], receiver_response[4]);
+
+        if(bcc1_wrong || bcc2_wrong)
+            continue;
+
+        // returns the size of the data received
+        return data_index - 1;        
+
+    } while (reject_counter < MAX_REJECTS);
+
+    return -1;
 }
 
 int llclose(int fd, struct termios *oldtio)
@@ -510,11 +552,13 @@ void atende(int signal)
 void update_transm_nums() {
     if(sender_field == C_SEND_0) {
         sender_field = C_SEND_1;
-        receiver_field = C_RR_0;
+        receiver_ready_field = C_RR_0;
+        receiver_reject_field = C_REJ_0;
     }
     else
     {
         sender_field = C_SEND_0;
-        receiver_field = C_RR_1;
+        receiver_ready_field = C_RR_1;
+        receiver_reject_field = C_REJ_1;
     }   
 }
