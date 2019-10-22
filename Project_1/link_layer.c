@@ -54,12 +54,12 @@ void update_transm_nums();
 /**
  * Byte Stuffing
  */
-void byte_stuffing(char* string, int *length){
-    char* new_string = malloc(length);
+void byte_stuffing(unsigned char* string, int *length){
+    unsigned char* new_string = (unsigned char*)malloc(*length);
     int new_length = *length;
     new_string[0] = string[0];
 
-    for(int i = 1, j=1; i < length-1; i++, j++){
+    for(int i = 1, j=1; i < *length-1; i++, j++){
         if(string[i] == FLAG){
             new_length++;
             new_string = realloc(new_string, new_length);
@@ -73,7 +73,7 @@ void byte_stuffing(char* string, int *length){
             new_string[j] = ESCAPE;
             j++;
             new_string[j] = 0x5D;
-        }
+         }
         else
         {
             new_string[j] = string[i];
@@ -81,9 +81,12 @@ void byte_stuffing(char* string, int *length){
     }
     new_string[new_length-1] = string[*length-1];
 
+
     string = realloc(string, new_length);
-    string = strcpy(string, new_string);
+    memcpy(string, new_string, new_length);
     *length = new_length;
+
+    printf("\n\n");
 
     free(new_string);
 }
@@ -103,9 +106,9 @@ void byte_destuffing(char* string, int *length){
             else {
                 new_string[j] = ESCAPE;
             }
-            
-            new_length--;          
-            
+
+            new_length--;
+
             i++;
         }
         else
@@ -113,10 +116,10 @@ void byte_destuffing(char* string, int *length){
             new_string[j] = string[i];
         }
     }
-    //new_string = realloc(new_string, new_length);  
+    //new_string = realloc(new_string, new_length);
     //string = realloc(string, new_length);
     string = memcpy(string, new_string, new_length);
-    
+
     *length = new_length;
 
     free(new_string);
@@ -351,7 +354,8 @@ int llwrite(int fd, char *buffer, int length)
         return -1;
     }
     printf("Sender: %x; receiver: %x\n", sender_field, receiver_ready_field);
-    unsigned char *I = malloc(6 * sizeof(char) + length * sizeof(char)); //[FLAG, A, C_SET, BCC1, [DADOS], BCC2, FLAG]
+    int I_length = length+6;
+    unsigned char *I = malloc(I_length * sizeof(char)); //[FLAG, A, C_SET, BCC1, [DADOS], BCC2, FLAG]
 
     void *sigalrm_handler = signal(SIGALRM, atende); // instala  rotina que atende interrupcao
 
@@ -371,6 +375,7 @@ int llwrite(int fd, char *buffer, int length)
     I[i_index] = BCC2;
     i_index++;
     I[i_index] = FLAG;
+    byte_stuffing(I, &I_length);
 
     int size_written;
     unsigned char received_char;
@@ -395,7 +400,7 @@ int llwrite(int fd, char *buffer, int length)
                 alarm_flag = 0;
             }
 
-            if ((size_written = write(fd, I, length + 6)) < 0)
+            if ((size_written = write(fd, I,  I_length)) < 0)
             {
                 perror("write");
                 return -1;
@@ -474,6 +479,10 @@ int llwrite(int fd, char *buffer, int length)
                 }
             }
         }
+        if(counter >= 4){
+          printf("Can't transmit plot.\n\n");
+          return -1;
+        }
     } while (received_char != receiver_ready_field);
 
     free(I);
@@ -526,7 +535,7 @@ int llread(int fd, char *buffer)
                 }
                 break;
             case 1:
-                printf("\nState 1: %x\n",buffer_aux[state]);            
+                printf("\nState 1: %x\n",buffer_aux[state]);
                 if (buffer_aux[state] == A) {
                     state = 2;
                 }
@@ -536,7 +545,7 @@ int llread(int fd, char *buffer)
                     state = 0;
                 break;
             case 2:
-                printf("\nState 2: %x\n",buffer_aux[state]);            
+                printf("\nState 2: %x\n",buffer_aux[state]);
                 if (buffer_aux[state] == sender_field) {
                     state = 3;
                 }
@@ -550,7 +559,7 @@ int llread(int fd, char *buffer)
                 }
                 break;
             case 3:
-                printf("\nState 3: %x\n",buffer_aux[state]);            
+                printf("\nState 3: %x\n",buffer_aux[state]);
                 if (buffer_aux[state] == A ^ sender_field)  {
                     state = 4;
                 }
@@ -563,7 +572,7 @@ int llread(int fd, char *buffer)
                 break;
 
             default:
-                printf("\nDefault: %x\n",buffer_aux[state]);            
+                printf("\nDefault: %x\n",buffer_aux[state]);
                 if(buffer_aux[state] == FLAG){
                     state = -1;
                     break;
@@ -594,9 +603,9 @@ int llread(int fd, char *buffer)
             receiver_response[3] = receiver_response[1] ^ receiver_response[2];
         }
         else {
-        
-            
-            // Destuffs 
+
+
+            // Destuffs
             byte_destuffing(buffer, &data_index);
 
             printf("\nData: ");
