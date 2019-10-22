@@ -92,10 +92,10 @@ void byte_stuffing(char* string, int *length){
  * Byte destuffing
  */
 void byte_destuffing(char* string, int *length){
-    char* new_string = malloc(length);
+    char* new_string = malloc(*length);
     int new_length = *length;
 
-    for(int i = 0, j = 0; i < length; i++, j++){
+    for(int i = 0, j = 0; i < *length; i++, j++){
         if(string[i] == ESCAPE){
             if(string[i+1] == 0x5e) {
                 new_string[j] = FLAG;
@@ -113,10 +113,9 @@ void byte_destuffing(char* string, int *length){
             new_string[j] = string[i];
         }
     }
-    new_string = realloc(new_string, new_length);
-    
-    string = realloc(string, new_length);
-    string = strcpy(string, new_string);
+    //new_string = realloc(new_string, new_length);  
+    //string = realloc(string, new_length);
+    string = memcpy(string, new_string, new_length);
     
     *length = new_length;
 
@@ -495,9 +494,9 @@ int llread(int fd, char *buffer)
 
     unsigned char buffer_aux[128];
 
-    printf("SENDER_FIELD: %x\n", sender_field);
-    printf("RECEIVER_READY_FIELD: %x\n", receiver_ready_field);
-    printf("RECEIVER_REJECT_FIELD: %x\n", receiver_reject_field);
+    //printf("SENDER_FIELD: %x\n", sender_field);
+    //printf("RECEIVER_READY_FIELD: %x\n", receiver_ready_field);
+    //printf("RECEIVER_REJECT_FIELD: %x\n", receiver_reject_field);
 
 
     int reject_counter = 0;
@@ -521,11 +520,13 @@ int llread(int fd, char *buffer)
             switch (state)
             {
             case 0:
+                printf("\nState 0: %x\n",buffer_aux[state]);
                 if (buffer_aux[state] == FLAG) {
                     state = 1;
                 }
                 break;
             case 1:
+                printf("\nState 1: %x\n",buffer_aux[state]);            
                 if (buffer_aux[state] == A) {
                     state = 2;
                 }
@@ -535,6 +536,7 @@ int llread(int fd, char *buffer)
                     state = 0;
                 break;
             case 2:
+                printf("\nState 2: %x\n",buffer_aux[state]);            
                 if (buffer_aux[state] == sender_field) {
                     state = 3;
                 }
@@ -548,6 +550,7 @@ int llread(int fd, char *buffer)
                 }
                 break;
             case 3:
+                printf("\nState 3: %x\n",buffer_aux[state]);            
                 if (buffer_aux[state] == A ^ sender_field)  {
                     state = 4;
                 }
@@ -560,6 +563,7 @@ int llread(int fd, char *buffer)
                 break;
 
             default:
+                printf("\nDefault: %x\n",buffer_aux[state]);            
                 if(buffer_aux[state] == FLAG){
                     state = -1;
                     break;
@@ -590,14 +594,22 @@ int llread(int fd, char *buffer)
             receiver_response[3] = receiver_response[1] ^ receiver_response[2];
         }
         else {
+        
             
             // Destuffs 
-            byte_destuffing(buffer_aux, data_index-1);
+            byte_destuffing(buffer, &data_index);
+
+            printf("\nData: ");
+            for(int i = 0; i < data_index; i++) {
+                printf("%x ", buffer[i]);
+            }
+            printf("\n\n");
 
             // Constructs the BCC2
             unsigned char BCC2 = 0;
-            for(unsigned int i = 4; i < last_state - 1; i++) {
-                BCC2 ^= buffer_aux[i];
+            for(int i = 0; i < data_index - 1; i++) {
+                BCC2 ^= buffer[i];
+                printf("BUFFER[%d]: %x      BCC2: %x\n", i, buffer[i], BCC2);
             }
 
             bcc2_wrong = (buffer_aux[last_state - 1] != BCC2);
@@ -631,7 +643,7 @@ int llread(int fd, char *buffer)
             continue;
 
         // returns the size of the data received
-        return data_index - 1;
+        return data_index;
 
     } while (reject_counter < MAX_REJECTS);
 
