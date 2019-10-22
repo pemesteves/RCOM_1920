@@ -36,6 +36,8 @@ unsigned char sender_field = C_SEND_0;
 unsigned char receiver_ready_field = C_RR_1;
 unsigned char receiver_reject_field = C_REJ_1;
 
+unsigned int timeout;
+
 int information_plot_counter = 1;
 
 /**
@@ -53,7 +55,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
     if (flag != TRANSMITTER && flag != RECEIVER)
         return -1;
 
-	void* sigalrm_handler;
+void* sigalrm_handler;
 
     if(flag == TRANSMITTER){
         sigalrm_handler = signal(SIGALRM, atende);  // instala  rotina que atende interrupcao
@@ -151,7 +153,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
 
             state = 0;
             while (state != 5) /* loop for input */
-            { 
+            {
                 if (alarm_flag == 1)
                 {
                     printf("Receiving error at retransmission number %d\n", counter - 1);
@@ -197,10 +199,10 @@ int llopen(char *gate, int flag, struct termios *oldtio)
                 }
             }
         }
-	   
-	if(counter >= 4){
+
+if(counter >= 4){
             write(stderr, "Can't open protocol\n", 21);
-	    return -1;
+    return -1;
         }
     }
     else
@@ -255,7 +257,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
         UA[3] = UA[1] ^ UA[2]; //BCC
         UA[4] = FLAG;
 
-		
+
   		int size_written = write(fd, UA, 5);
   		printf("%d bytes written: ", size_written);
         printf("%x %x %x %x %x\n", UA[0], UA[1], UA[2], UA[3], UA[4]);
@@ -276,17 +278,11 @@ int llwrite(int fd, char *buffer, int length)
         write(stderr, "Length must be positive!\n", 26);
         return -1;
     }
+    printf("Sender: %x; receiver: %x\n", sender_field, receiver_ready_field);
     unsigned char *I = malloc(6 * sizeof(char) + length * sizeof(char)); //[FLAG, A, C_SET, BCC1, [DADOS], BCC2, FLAG]
 
-    /*  while (counter < 4 && state < 5)
-    {
-        printf("Transmission number %d\n", counter);
-        if (alarm_flag)
-        {
-            alarm(newtio.c_cc[VTIME]);
-            alarm_flag = 0;
-        }
-*/
+    void *sigalrm_handler = signal(SIGALRM, atende); // instala  rotina que atende interrupcao
+
     I[0] = FLAG;
     I[1] = A;
     I[2] = sender_field; //C_SET;
@@ -306,78 +302,114 @@ int llwrite(int fd, char *buffer, int length)
 
     int size_written;
     unsigned char received_char;
-    do{
+
+    int state = 0;
+    unsigned reject_counter = 0;
+
+    do
+    {
+        alarm_flag = 1;
+        counter = 0;
+        state = 0;
+        alarm(0);
         received_char = 0xFF;
-
-        if ((size_written = write(fd, I, length + 6)) < 0)
+        while (counter < 4 && state < 5)
         {
-            perror("write");
-            return -1;
-        }
-
-        printf("%d bytes written.\n", size_written);
-
-        unsigned char RR[5];
-
-        int state = 0;
-
-        while (state != 5) /* loop for input */
-        {
-            if (alarm_flag == 1)
+            printf("Transmission number %d\n", counter);
+            if (alarm_flag)
             {
-                printf("Receiving error at retransmission number %d\n", counter - 1);
-                break;
+                alarm(timeout);
+                printf("Set alarm!\n\n");
+                alarm_flag = 0;
             }
-            read(fd, &RR[state], 1); /* returns after 5 chars have been input */
-            switch (state)
-            {
-            case 0:
-                if (RR[state] == FLAG)
-                    state = 1;
-                break;
-            case 1:
-                if (RR[state] == A)
-                    state = 2;
-                else if (RR[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-            case 2:
-                if (RR[state] == receiver_ready_field){
-                    received_char = receiver_ready_field;
 
-                    state = 3;
+            if ((size_written = write(fd, I, length + 6)) < 0)
+            {
+                perror("write");
+                return -1;
+            }
+
+            printf("%d bytes written.\n", size_written);
+
+            unsigned char RR[5];
+
+            state = 0;
+
+            while (state != 5) /* loop for input */
+            {
+                if (alarm_flag == 1)
+                {
+                    printf("Receiving error at retransmission number %d\n", counter - 1);
+                    break;
                 }
-                else if (RR[state] == FLAG)
-                    state = 1;
-                else{ //Error in transmission: receiver asked for the same plot
-                    state = 3;
+
+                if(read(fd, &RR[state], 1)<0){ /* returns after 5 chars have been input */
+                    perror("read");
                 }
-                break;
-            case 3:
-                if (RR[state] == received_char ^ A)
-                    state = 4;
-                else
-                    state = 0;
-                break;
-            case 4:
-                if (RR[state] == FLAG)
-                    state = 5;
-                else
-                    state = 0;
-                break;
-            default:
-                break;
+
+                switch (state)
+                {
+                case 0:
+                    if (RR[state] == FLAG)
+                        state = 1;
+                    break;
+                case 1:
+                    if (RR[state] == A)
+                        state = 2;
+                    else if (RR[state] == FLAG)
+                        state = 1;
+                    else
+                        state = 0;
+                    break;
+                case 2:
+                    if (RR[state] == receiver_ready_field)
+                    {
+                        received_char = receiver_ready_field;
+                        printf("Received Receiver Ready\n\n");
+                        state = 3;
+                    }
+                    else if (RR[state] == FLAG)
+                        state = 1;
+                    else //Error in transmission: receiver asked for the same plot
+                    {
+                        received_char = receiver_reject_field;
+                        printf("Received Receiver Reject\n\n");
+                        reject_counter++;
+                        if(reject_counter >= MAX_REJECTS){
+                            free(I);
+
+                            alarm(0);
+                            (void)signal(SIGALRM, sigalrm_handler);
+                            return -1;
+                        }
+                        state = 3;
+                    }
+                    break;
+                case 3:
+                    if (RR[state] == received_char ^ A)
+                        state = 4;
+                    else
+                        state = 0;
+                    break;
+                case 4:
+                    if (RR[state] == FLAG)
+                        state = 5;
+                    else
+                        state = 0;
+                    break;
+                default:
+                    break;
+                }
             }
         }
-    }while(received_char != receiver_ready_field);
+    } while (received_char != receiver_ready_field);
 
     free(I);
-    
-    update_transm_nums();
 
-    printf("Received RR\n");
+    alarm(0);
+    (void)signal(SIGALRM, sigalrm_handler);
+
+    update_transm_nums();
 
     return size_written;
 }
@@ -405,7 +437,7 @@ int llread(int fd, char *buffer)
         int data_index= 0;
         int last_state = 0;
 
-        bool bcc1_wrong = false, bcc2_wrong = false;        
+        bool bcc1_wrong = false, bcc2_wrong = false;
 
         while (state != -1)
         {                             /* loop for input */
@@ -458,7 +490,7 @@ int llread(int fd, char *buffer)
                 if(buffer_aux[state] == FLAG){
                     state = -1;
                     break;
-                }                    
+                }
                 buffer[data_index] = buffer_aux[state];
 
                 state++;
@@ -475,18 +507,18 @@ int llread(int fd, char *buffer)
 
         receiver_response[0] = FLAG;
         receiver_response[1] = A;
-        receiver_response[4] = FLAG;    
-        
+        receiver_response[4] = FLAG;
+
 
         if(bcc1_wrong) {
             printf("\nRejected plot, BCC1 is wrong\n\n");
-            
+
             receiver_response[2] = receiver_reject_field;
-            receiver_response[3] = receiver_response[1] ^ receiver_response[2]; 
+            receiver_response[3] = receiver_response[1] ^ receiver_response[2];
         }
         else {
             // Constructs the BCC2
-            unsigned char BCC2 = 0;        
+            unsigned char BCC2 = 0;
             for(unsigned int i = 4; i < last_state - 1; i++) {
                 BCC2 ^= buffer_aux[i];
             }
@@ -494,7 +526,7 @@ int llread(int fd, char *buffer)
             bcc2_wrong = (buffer_aux[last_state - 1] != BCC2);
 
             // If the BCC2 is wrong, sends REJ (receiver reject), and leaves the transmission numbers intact
-            if (bcc2_wrong) 
+            if (bcc2_wrong)
             {
                 printf("\nRejected plot, BCC2 is wrong\n\n");
 
@@ -502,15 +534,15 @@ int llread(int fd, char *buffer)
                 receiver_response[3] = receiver_response[1] ^ receiver_response[2]; //BCC
             }
             // Otherwise, sends RR (receiver ready) and updates the transmission numbers
-            else 
+            else
             {
                 printf("\nReceived 'plot I' correctly\n");
 
                 receiver_response[2] = receiver_ready_field;
                 receiver_response[3] = receiver_response[1] ^ receiver_response[2]; //BCC
 
-                update_transm_nums();            
-            }        
+                update_transm_nums();
+            }
         }
 
         int size_written = write(fd, receiver_response, 5);
@@ -522,7 +554,7 @@ int llread(int fd, char *buffer)
             continue;
 
         // returns the size of the data received
-        return data_index - 1;        
+        return data_index - 1;
 
     } while (reject_counter < MAX_REJECTS);
 
@@ -560,5 +592,5 @@ void update_transm_nums() {
         sender_field = C_SEND_0;
         receiver_ready_field = C_RR_1;
         receiver_reject_field = C_REJ_1;
-    }   
+    }
 }
