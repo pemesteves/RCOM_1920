@@ -88,6 +88,41 @@ void byte_stuffing(char* string, int *length){
     free(new_string);
 }
 
+/**
+ * Byte destuffing
+ */
+void byte_destuffing(char* string, int *length){
+    char* new_string = malloc(length);
+    int new_length = *length;
+
+    for(int i = 0, j = 0; i < length; i++, j++){
+        if(string[i] == ESCAPE){
+            if(string[i+1] == 0x5e) {
+                new_string[j] = FLAG;
+            }
+            else {
+                new_string[j] = ESCAPE;
+            }
+            
+            new_length--;          
+            
+            i++;
+        }
+        else
+        {
+            new_string[j] = string[i];
+        }
+    }
+    new_string = realloc(new_string, new_length);
+    
+    string = realloc(string, new_length);
+    string = strcpy(string, new_string);
+    
+    *length = new_length;
+
+    free(new_string);
+}
+
 int llopen(char *gate, int flag, struct termios *oldtio)
 {
     if (flag != TRANSMITTER && flag != RECEIVER)
@@ -555,6 +590,10 @@ int llread(int fd, char *buffer)
             receiver_response[3] = receiver_response[1] ^ receiver_response[2];
         }
         else {
+            
+            // Destuffs 
+            byte_destuffing(buffer_aux, data_index-1);
+
             // Constructs the BCC2
             unsigned char BCC2 = 0;
             for(unsigned int i = 4; i < last_state - 1; i++) {
