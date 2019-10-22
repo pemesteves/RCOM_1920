@@ -19,6 +19,7 @@
 #define BIT(n) 1 << n
 
 #define FLAG        0x7e
+#define ESCAPE      0x7D
 #define A           0x03
 #define C_SET       0x03
 #define C_UA        0x07
@@ -49,6 +50,43 @@ void atende(int signal);
  * Update sender and receiver numbers
  */
 void update_transm_nums();
+
+/**
+ * Byte Stuffing
+ */
+void byte_stuffing(char* string, int *length){
+    char* new_string = malloc(length);
+    int new_length = *length;
+    new_string[0] = string[0];
+
+    for(int i = 1, j=1; i < length-1; i++, j++){
+        if(string[i] == FLAG){
+            new_length++;
+            new_string = realloc(new_string, new_length);
+            new_string[j] = ESCAPE;
+            j++;
+            new_string[j] = 0x5E;
+        }
+        else if(string[i] == ESCAPE){
+            new_length++;
+            new_string = realloc(new_string, new_length);
+            new_string[j] = ESCAPE;
+            j++;
+            new_string[j] = 0x5D;
+        }
+        else
+        {
+            new_string[j] = string[i];
+        }
+    }
+    new_string[new_length-1] = string[*length-1];
+
+    string = realloc(string, new_length);
+    string = strcpy(string, new_string);
+    *length = new_length;
+
+    free(new_string);
+}
 
 int llopen(char *gate, int flag, struct termios *oldtio)
 {
