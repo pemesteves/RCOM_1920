@@ -130,7 +130,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
     if (flag != TRANSMITTER && flag != RECEIVER)
         return -1;
 
-void* sigalrm_handler;
+    void* sigalrm_handler;
 
     if(flag == TRANSMITTER){
         sigalrm_handler = signal(SIGALRM, atende);  // instala  rotina que atende interrupcao
@@ -274,10 +274,9 @@ void* sigalrm_handler;
                 }
             }
         }
-
-if(counter >= 4){
+        if(counter >= 4){
             write(stderr, "Can't open protocol\n", 21);
-    return -1;
+            return -1;
         }
     }
     else
@@ -348,38 +347,23 @@ if(counter >= 4){
 
 int llwrite(int fd, char *buffer, int length)
 {
+    // REMOVER depois porque a app_player nunca permitirá isto
     if (length <= 0)
     {
         write(stderr, "Length must be positive!\n", 26);
         return -1;
     }
     printf("Sender: %x; receiver: %x\n", sender_field, receiver_ready_field);
-    int I_length = length+6;
-    unsigned char *I = malloc(I_length * sizeof(char)); //[FLAG, A, C_SET, BCC1, [DADOS], BCC2, FLAG]
 
-    void *sigalrm_handler = signal(SIGALRM, atende); // instala  rotina que atende interrupcao
-
-    I[0] = FLAG;
-    I[1] = A;
-    I[2] = sender_field; //C_SET;
-    I[3] = I[1] ^ I[2];  //BCC1
-
-    unsigned char BCC2 = 0;
-    int i_index = 4;
-    for (int i = 0; i < length; i++) //I think this can be changed -> strcpy
-    {
-        I[i_index] = buffer[i];
-        BCC2 ^= buffer[i];
-        i_index++;
-    }
-    I[i_index] = BCC2;
-    i_index++;
-    I[i_index] = FLAG;
-    byte_stuffing(I, &I_length);
+    void *sigalrm_handler = signal(SIGALRM, atende);
+    
+    unsigned char *plot = create_information_plot(sender_field, buffer, length);
+    
+    int plot_length = length + 6;    
+    byte_stuffing(plot, &plot_length);
 
     int size_written;
     unsigned char received_char;
-
     int state = 0;
     unsigned reject_counter = 0;
 
@@ -400,7 +384,7 @@ int llwrite(int fd, char *buffer, int length)
                 alarm_flag = 0;
             }
 
-            if ((size_written = write(fd, I,  I_length)) < 0)
+            if ((size_written = write(fd, plot,  plot_length)) < 0)
             {
                 perror("write");
                 return -1;
@@ -453,7 +437,7 @@ int llwrite(int fd, char *buffer, int length)
                         printf("Received Receiver Reject\n\n");
                         reject_counter++;
                         if(reject_counter >= MAX_REJECTS){
-                            free(I);
+                            free(plot);
 
                             alarm(0);
                             (void)signal(SIGALRM, sigalrm_handler);
@@ -485,7 +469,7 @@ int llwrite(int fd, char *buffer, int length)
         }
     } while (received_char != receiver_ready_field);
 
-    free(I);
+    free(plot);
 
     alarm(0);
     (void)signal(SIGALRM, sigalrm_handler);
@@ -501,12 +485,7 @@ int llread(int fd, char *buffer)
     printf("Information plot %d\n\n", information_plot_counter);
     information_plot_counter++;
 
-    unsigned char buffer_aux[128];
-
-    //printf("SENDER_FIELD: %x\n", sender_field);
-    //printf("RECEIVER_READY_FIELD: %x\n", receiver_ready_field);
-    //printf("RECEIVER_REJECT_FIELD: %x\n", receiver_reject_field);
-
+    unsigned char received_plot[128];
 
     int reject_counter = 0;
 
@@ -522,34 +501,34 @@ int llread(int fd, char *buffer)
 
         while (state != -1)
         {                             /* loop for input */
-            int num = read(fd, &buffer_aux[state], 1); /* returns after 5 chars have been input */
+            int num = read(fd, &received_plot[state], 1); /* returns after 5 chars have been input */
 
-            //printf("buffer: %x\nstate: %d\n\n", buffer_aux[state], state);
+            //printf("buffer: %x\nstate: %d\n\n", received_plot[state], state);
 
             switch (state)
             {
             case 0:
-                printf("\nState 0: %x\n",buffer_aux[state]);
-                if (buffer_aux[state] == FLAG) {
+                printf("\nState 0: %x\n",received_plot[state]);
+                if (received_plot[state] == FLAG) {
                     state = 1;
                 }
                 break;
             case 1:
-                printf("\nState 1: %x\n",buffer_aux[state]);
-                if (buffer_aux[state] == A) {
+                printf("\nState 1: %x\n",received_plot[state]);
+                if (received_plot[state] == A) {
                     state = 2;
                 }
-                else if (buffer_aux[state] == FLAG)
+                else if (received_plot[state] == FLAG)
                     state = 1;
                 else
                     state = 0;
                 break;
             case 2:
-                printf("\nState 2: %x\n",buffer_aux[state]);
-                if (buffer_aux[state] == sender_field) {
+                printf("\nState 2: %x\n",received_plot[state]);
+                if (received_plot[state] == sender_field) {
                     state = 3;
                 }
-                else if (buffer_aux[state] == FLAG)
+                else if (received_plot[state] == FLAG)
                 {
                     state = 1;
                 }
@@ -559,8 +538,8 @@ int llread(int fd, char *buffer)
                 }
                 break;
             case 3:
-                printf("\nState 3: %x\n",buffer_aux[state]);
-                if (buffer_aux[state] == A ^ sender_field)  {
+                printf("\nState 3: %x\n",received_plot[state]);
+                if (received_plot[state] == A ^ sender_field)  {
                     state = 4;
                 }
                 else
@@ -572,12 +551,12 @@ int llread(int fd, char *buffer)
                 break;
 
             default:
-                printf("\nDefault: %x\n",buffer_aux[state]);
-                if(buffer_aux[state] == FLAG){
+                printf("\nDefault: %x\n",received_plot[state]);
+                if(received_plot[state] == FLAG){
                     state = -1;
                     break;
                 }
-                buffer[data_index] = buffer_aux[state];
+                buffer[data_index] = received_plot[state];
 
                 state++;
                 data_index++;
@@ -589,18 +568,13 @@ int llread(int fd, char *buffer)
         }
 
         // Starts constructing the response
-        unsigned char receiver_response[5];
-
-        receiver_response[0] = FLAG;
-        receiver_response[1] = A;
-        receiver_response[4] = FLAG;
+        unsigned char* receiver_response;
 
 
         if(bcc1_wrong) {
             printf("\nRejected plot, BCC1 is wrong\n\n");
 
-            receiver_response[2] = receiver_reject_field;
-            receiver_response[3] = receiver_response[1] ^ receiver_response[2];
+            receiver_response = create_supervision_plot(receiver_reject_field);
         }
         else {
 
@@ -621,23 +595,21 @@ int llread(int fd, char *buffer)
                 printf("BUFFER[%d]: %x      BCC2: %x\n", i, buffer[i], BCC2);
             }
 
-            bcc2_wrong = (buffer_aux[last_state - 1] != BCC2);
+            bcc2_wrong = (received_plot[last_state - 1] != BCC2);
 
             // If the BCC2 is wrong, sends REJ (receiver reject), and leaves the transmission numbers intact
             if (bcc2_wrong)
             {
                 printf("\nRejected plot, BCC2 is wrong\n\n");
 
-                receiver_response[2] = receiver_reject_field;
-                receiver_response[3] = receiver_response[1] ^ receiver_response[2]; //BCC
+                receiver_response = create_supervision_plot(receiver_reject_field);
             }
             // Otherwise, sends RR (receiver ready) and updates the transmission numbers
             else
             {
                 printf("\nReceived 'plot I' correctly\n");
 
-                receiver_response[2] = receiver_ready_field;
-                receiver_response[3] = receiver_response[1] ^ receiver_response[2]; //BCC
+                receiver_response = create_supervision_plot(receiver_ready_field);
 
                 update_transm_nums();
             }
@@ -691,4 +663,41 @@ void update_transm_nums() {
         receiver_ready_field = C_RR_1;
         receiver_reject_field = C_REJ_1;
     }
+}
+
+/* Plot-sending auxiliary functions */
+
+unsigned char* create_supervision_plot(char control_field) {
+    unsigned char *plot = malloc(SUPERVISION_PLOT_SIZE);  
+
+    plot[0] = FLAG;
+    plot[1] = A;
+    plot[2] = control_field;
+    plot[3] = plot[1] ^ plot[2];
+    plot[4] = FLAG;
+
+    return plot;
+}
+
+unsigned char* create_information_plot(char control_field, char *data, int length) {
+    unsigned char BCC2 = 0;
+    for(int i = 0; i < length; i++) {
+        BCC2 ^= data[i];
+    }
+    
+    unsigned char *plot = malloc(length * sizeof(char));
+
+    plot[0] = FLAG;
+    plot[1] = A;
+    plot[2] = control_field;
+    plot[3] = plot[1] ^ plot[2];
+    memcpy(&plot[4], data, length);
+	plot[4 + length] = BCC2;
+	plot[5 + length] = FLAG;    
+
+    return plot;
+}
+
+int send_plot(int fd, unsigned char* plot) {
+    return 0;
 }
