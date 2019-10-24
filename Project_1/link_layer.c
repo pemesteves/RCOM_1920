@@ -125,6 +125,14 @@ void byte_destuffing(char* string, int *length){
     free(new_string);
 }
 
+
+
+/****************************/
+/**                        **/
+/**  Auxiliary Functions   **/
+/**                        **/
+/****************************/
+
 int llopen(char *gate, int flag, struct termios *oldtio)
 {
     if (flag != TRANSMITTER && flag != RECEIVER)
@@ -514,7 +522,7 @@ int llread(int fd, char *buffer)
         byte_destuffing(received_plot, &received_plot_length);        
 
         int data_length = 0;
-        unsigned char* data = retrieve_data(received_plot, received_plot_length, &data_length);
+        unsigned char* data = retrieve_data(received_plot, received_plot_length, &data_length); // CHANGE! (buffer instead of data and passes to func params )
 
         // Checks if the BCC2 is correct
         unsigned char received_bcc2 = retrieve_bcc2(received_plot, received_plot_length);
@@ -531,6 +539,9 @@ int llread(int fd, char *buffer)
         send_supervision_plot(fd, receiver_ready_field);
 
         update_transm_nums();
+
+        memcpy(buffer, data, data_length);
+        free(data);
 
         return data_length;
     }
@@ -572,7 +583,16 @@ void update_transm_nums() {
     }
 }
 
-/* Plot-sending auxiliary functions */
+
+
+/****************************/
+/**                        **/
+/**  Auxiliary Functions   **/
+/**                        **/
+/****************************/
+
+
+/* Supervision Plots */
 
 unsigned char* create_supervision_plot(char control_field) {
     unsigned char *plot = malloc(SUPERVISION_PLOT_SIZE);  
@@ -585,6 +605,17 @@ unsigned char* create_supervision_plot(char control_field) {
 
     return plot;
 }
+
+int send_supervision_plot(int fd, char control_field) {
+    unsigned char* receiver_response = create_supervision_plot(control_field);
+    write(fd, receiver_response, 5);
+    free(receiver_response);  
+
+    return 0;  
+}
+
+
+/* Information Plots */
 
 void create_information_plot(char control_field, char *data, int length, unsigned char* plot) {
     unsigned char BCC2 = 0;
@@ -672,16 +703,7 @@ int receive_information_plot(int fd, unsigned char *received_plot, int *received
     return 0;
 }
 
-int send_supervision_plot(int fd, char control_field) {
-    unsigned char* receiver_response = create_supervision_plot(control_field);
-    write(fd, receiver_response, 5);
-    free(receiver_response);  
-
-    return 0;  
-}
-
 unsigned char* retrieve_data(unsigned char *information_plot, int plot_length, int *data_length) {
-    printf("AHAHAHAHA %d", *data_length);
     *data_length = plot_length - 6;
     
     unsigned char *data = (unsigned char*)malloc(*data_length);
@@ -706,13 +728,11 @@ unsigned char calculate_bcc2(unsigned char *data, int data_length) {
 }
 
 
-int send_plot(int fd, unsigned char* plot) {
-    return 0;
-}
+/* Utiliritaty Functions */
 
 void print_string(unsigned char *string, int length) {
     for(int i = 0; i < length; i++) {
-        printf("%x ", string[i]);
+        printf("%c ", string[i]);
     }
     printf("\n");
 }

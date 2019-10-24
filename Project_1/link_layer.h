@@ -25,9 +25,6 @@ int send_supervision_plot(int fd, char control_field);
 void create_information_plot(char control_field, char *data, int length, unsigned char* plot);
 int receive_information_plot(int fd, unsigned char *received_plot, int *received_plot_length);
 
-int send_plot(int fd, unsigned char* plot);
-
-
 /* Calculation functions */
 
 unsigned char* retrieve_data(unsigned char *information_plot, int plot_length, int *data_length);
