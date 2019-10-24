@@ -23,14 +23,6 @@ int main(int argc, char** argv)
 	int fd,c, res;
 	char buf[255];
 
-	if ( (argc < 2) ||
-	   ((strcmp("/dev/ttyS0", argv[1])!=0) &&
-		(strcmp("/dev/ttyS1", argv[1])!=0) &&
-		(strcmp("/dev/ttyS2", argv[1])!=0))) {
-	printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
-	exit(1);
-	}
-
 	struct termios oldtio;
 
 	if((fd = llopen(argv[1], TRANSMITTER, &oldtio)) < 0){
@@ -40,10 +32,10 @@ int main(int argc, char** argv)
 
 	for(int i = 0; i < 3; i++){
 		unsigned char data[8];
-		sprintf(data, "Hello_%d", i);
+		sprintf(data, "Hello~%d", i);
 		printf("Message\n");
 
-		if(llwrite(fd, data, 5) < 0){
+		if(llwrite(fd, data, sizeof(data)/sizeof(data[0])) < 0){
 			printf("llwrite error\n");
 			return -1;
 		}
