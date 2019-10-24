@@ -37,7 +37,7 @@ unsigned char sender_field = C_SEND_0;
 unsigned char receiver_ready_field = C_RR_1;
 unsigned char receiver_reject_field = C_REJ_1;
 
-unsigned int timeout;
+unsigned int timeout = 3;
 
 int information_plot_counter = 1;
 
@@ -384,6 +384,7 @@ int llwrite(int fd, char *buffer, int length)
         state = 0;
         alarm(0);
         received_char = 0xFF;
+
         while (counter < 4 && state < 5)
         {
             printf("Transmission number %d\n", counter);

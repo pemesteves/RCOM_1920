@@ -50,7 +50,7 @@ int main(int argc, char** argv)
 	int data_length = 100;
 	unsigned char *data = (unsigned char*)malloc(data_length*sizeof(char)+1);
 	
-	for(int i = 0; i < 3; i++){
+	for(;;){
 		memset(data, '\0', data_length);
 		num_bytes_read = read_file(fd, data, data_length);
 
