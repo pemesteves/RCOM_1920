@@ -11,6 +11,7 @@
 
 #include "link_layer.h"
 #include "app_layer.h"
+#include "files.h"
 
 #define MODEMDEVICE "/dev/ttyS1"
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
@@ -20,30 +21,65 @@
 
 int main(int argc, char** argv)
 {
-	int fd,c, res;
-	char buf[255];
+	int serial_fd,c, res;
 
+	//File variables
+	int fd, num_bytes_read;
+	
 	struct termios oldtio;
 
-	if((fd = llopen(argv[1], TRANSMITTER, &oldtio)) < 0){
+	if((serial_fd = llopen(argv[1], TRANSMITTER, &oldtio)) < 0){
 		printf("llopen error\n");
 		return -1;
 	}
 
-	for(int i = 0; i < 3; i++){
-		unsigned char data[8];
-		sprintf(data, "Hello~%d", i);
-		printf("Message\n");
+	if(file_exist("./pinguim.gif")){
+		printf("File %s doesn't exist!!!\n\n", "./pinguim.gif");
+		return -1;
+	}
+	else{
+		printf("File %s exist\n\n", "./pinguim.gif");
+	}
 
-		if(llwrite(fd, data, sizeof(data)/sizeof(data[0])) < 0){
+	if((fd = open_file("./pinguim.gif")) < 0){
+		printf("Can't open %s!\n\n", "./pinguim.gif");
+		return -1;
+	}
+	printf("Opened file %s\n\n", "./pinguim.gif");
+
+	int data_length = 100;
+	unsigned char *data = (unsigned char*)malloc(data_length*sizeof(char)+1);
+	
+	for(int i = 0; i < 3; i++){
+		memset(data, '\0', data_length);
+		num_bytes_read = read_file(fd, data, data_length);
+
+		if(num_bytes_read < 0){
+			printf("Error: read file\n\n");
+			return -1;
+		} else if(num_bytes_read == 0){
+			printf("End of file\n\n");
+			break;
+		}
+		printf("Read %i bytes from file %s\n\n", num_bytes_read, "./pinguim.gif");
+
+		printf("Sending message...\n");
+
+		if(llwrite(serial_fd, data, num_bytes_read) < 0){
 			printf("llwrite error\n");
 			return -1;
 		}
 	}
+	free(data);
 
 	//sleep(2);
 
-	if(llclose(fd,& oldtio)){
+	if(close_file(fd) < 0){
+		printf("Can't close %s!\n\n", "./pinguim.gif");
+		return -1;
+	}
+
+	if(llclose(serial_fd,& oldtio)){
 		printf("llclose error\n");
 		return -1;
 	}
