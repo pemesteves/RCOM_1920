@@ -357,9 +357,11 @@ int llwrite(int fd, char *buffer, int length)
 
     void *sigalrm_handler = signal(SIGALRM, atende);
     
-    unsigned char *plot = create_information_plot(sender_field, buffer, length);
-    
-    int plot_length = length + 6;    
+    int plot_length = length + 6; 
+    unsigned char *plot = malloc(plot_length * sizeof(char));
+
+    create_information_plot(sender_field, buffer, length, plot);
+       
     byte_stuffing(plot, &plot_length);
 
     int size_written;
@@ -389,6 +391,12 @@ int llwrite(int fd, char *buffer, int length)
                 perror("write");
                 return -1;
             }
+
+            printf("Plot written: ");
+            for(int i = 0; i < plot_length; i++){
+                printf("%x ", plot[i]);
+            }
+            printf("\n\n");
 
             printf("%d bytes written.\n", size_written);
 
@@ -532,7 +540,7 @@ int llread(int fd, char *buffer)
 
 int llclose(int fd, struct termios *oldtio)
 {
-    if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
+    if (tcsetattr(fd, TCSANOW, oldtio) == -1)
     {
         perror("tcsetattr");
         return 1;
@@ -578,13 +586,11 @@ unsigned char* create_supervision_plot(char control_field) {
     return plot;
 }
 
-unsigned char* create_information_plot(char control_field, char *data, int length) {
+void create_information_plot(char control_field, char *data, int length, unsigned char* plot) {
     unsigned char BCC2 = 0;
     for(int i = 0; i < length; i++) {
         BCC2 ^= data[i];
     }
-    
-    unsigned char *plot = malloc(length * sizeof(char));
 
     plot[0] = FLAG;
     plot[1] = A;
@@ -593,8 +599,6 @@ unsigned char* create_information_plot(char control_field, char *data, int lengt
     memcpy(&plot[4], data, length);
 	plot[4 + length] = BCC2;
 	plot[5 + length] = FLAG;    
-
-    return plot;
 }
 
 int receive_information_plot(int fd, unsigned char *received_plot, int *received_plot_length) {
