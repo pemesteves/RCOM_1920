@@ -485,148 +485,47 @@ int llread(int fd, char *buffer)
     printf("Information plot %d\n\n", information_plot_counter);
     information_plot_counter++;
 
-    unsigned char received_plot[128];
+    unsigned char received_plot[256];
+    int received_plot_length = 0;
 
     int reject_counter = 0;
 
-    do
+    while(reject_counter < MAX_REJECTS)
     {
-        reject_counter++;
-
-        int state = 0;
-        int data_index= 0;
-        int last_state = 0;
-
-        bool bcc1_wrong = false, bcc2_wrong = false;
-
-        while (state != -1)
-        {                             /* loop for input */
-            int num = read(fd, &received_plot[state], 1); /* returns after 5 chars have been input */
-
-            //printf("buffer: %x\nstate: %d\n\n", received_plot[state], state);
-
-            switch (state)
-            {
-            case 0:
-                printf("\nState 0: %x\n",received_plot[state]);
-                if (received_plot[state] == FLAG) {
-                    state = 1;
-                }
-                break;
-            case 1:
-                printf("\nState 1: %x\n",received_plot[state]);
-                if (received_plot[state] == A) {
-                    state = 2;
-                }
-                else if (received_plot[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-            case 2:
-                printf("\nState 2: %x\n",received_plot[state]);
-                if (received_plot[state] == sender_field) {
-                    state = 3;
-                }
-                else if (received_plot[state] == FLAG)
-                {
-                    state = 1;
-                }
-                else
-                {
-                    state = 0;
-                }
-                break;
-            case 3:
-                printf("\nState 3: %x\n",received_plot[state]);
-                if (received_plot[state] == A ^ sender_field)  {
-                    state = 4;
-                }
-                else
-                {
-                    state = -1;
-                    bcc1_wrong = true;
-                    break;
-                }
-                break;
-
-            default:
-                printf("\nDefault: %x\n",received_plot[state]);
-                if(received_plot[state] == FLAG){
-                    state = -1;
-                    break;
-                }
-                buffer[data_index] = received_plot[state];
-
-                state++;
-                data_index++;
-
-                last_state = state;
-
-                break;
-            }
-        }
-
-        // Starts constructing the response
-        unsigned char* receiver_response;
-
-
-        if(bcc1_wrong) {
+        // Receives the information plot
+        if(receive_information_plot(fd, received_plot, &received_plot_length)) {
             printf("\nRejected plot, BCC1 is wrong\n\n");
 
-            receiver_response = create_supervision_plot(receiver_reject_field);
-        }
-        else {
+            send_supervision_plot(fd, receiver_reject_field);
 
-
-            // Destuffs
-            byte_destuffing(buffer, &data_index);
-
-            printf("\nData: ");
-            for(int i = 0; i < data_index; i++) {
-                printf("%x ", buffer[i]);
-            }
-            printf("\n\n");
-
-            // Constructs the BCC2
-            unsigned char BCC2 = 0;
-            for(int i = 0; i < data_index - 1; i++) {
-                BCC2 ^= buffer[i];
-                printf("BUFFER[%d]: %x      BCC2: %x\n", i, buffer[i], BCC2);
-            }
-
-            bcc2_wrong = (received_plot[last_state - 1] != BCC2);
-
-            // If the BCC2 is wrong, sends REJ (receiver reject), and leaves the transmission numbers intact
-            if (bcc2_wrong)
-            {
-                printf("\nRejected plot, BCC2 is wrong\n\n");
-
-                receiver_response = create_supervision_plot(receiver_reject_field);
-            }
-            // Otherwise, sends RR (receiver ready) and updates the transmission numbers
-            else
-            {
-                printf("\nReceived 'plot I' correctly\n");
-
-                receiver_response = create_supervision_plot(receiver_ready_field);
-
-                update_transm_nums();
-            }
+            reject_counter++;
+            break;
         }
 
-        int size_written = write(fd, receiver_response, 5);
+        // Destuffs the plot
+        byte_destuffing(received_plot, &received_plot_length);        
 
-        printf("%d bytes written: ", size_written);
-        printf("%x %x %x %x %x\n", receiver_response[0], receiver_response[1], receiver_response[2], receiver_response[3], receiver_response[4]);
+        int data_length = 0;
+        unsigned char* data = retrieve_data(received_plot, received_plot_length, &data_length);
 
-        if(bcc1_wrong || bcc2_wrong)
-            continue;
+        // Checks if the BCC2 is correct
+        unsigned char received_bcc2 = retrieve_bcc2(received_plot, received_plot_length);
+        unsigned char calculated_bcc2 = calculate_bcc2(data, data_length);
+        if(received_bcc2 != calculated_bcc2) {
+            printf("\nRejected plot, BCC2 is wrong\n\n");
+            
+            send_supervision_plot(fd, receiver_reject_field);
 
-        // returns the size of the data received
-        return data_index;
+            reject_counter++;
+            break;
+        }
+        
+        send_supervision_plot(fd, receiver_ready_field);
 
-    } while (reject_counter < MAX_REJECTS);
+        update_transm_nums();
+
+        return data_length;
+    }
 
     return -1;
 }
@@ -698,6 +597,118 @@ unsigned char* create_information_plot(char control_field, char *data, int lengt
     return plot;
 }
 
+int receive_information_plot(int fd, unsigned char *received_plot, int *received_plot_length) {
+    int state = 0;
+    int last_state = 0;
+
+    printf("\n");
+    while (state != -1)
+    {
+        int num = read(fd, &received_plot[state], 1);
+
+        switch (state)
+        {
+        case 0:
+            printf("State 0: %x\n",received_plot[state]);
+            if (received_plot[state] == FLAG) {
+                state = 1;
+            }
+            break;
+        case 1:
+            printf("State 1: %x\n",received_plot[state]);
+            if (received_plot[state] == A) {
+                state = 2;
+            }
+            else if (received_plot[state] == FLAG)
+                state = 1;
+            else
+                state = 0;
+            break;
+        case 2:
+            printf("State 2: %x\n",received_plot[state]);
+            if (received_plot[state] == sender_field) {
+                state = 3;
+            }
+            else if (received_plot[state] == FLAG)
+            {
+                state = 1;
+            }
+            else
+            {
+                state = 0;
+            }
+            break;
+        case 3:
+            printf("State 3: %x\n",received_plot[state]);
+            if (received_plot[state] == A ^ sender_field)  {
+                state = 4;
+            }
+            else
+            {   
+                // BCC1 is wrong
+                return -1;
+            }
+            break;
+
+        default:
+            printf("Default: %x\n",received_plot[state]);
+            if(received_plot[state] == FLAG){
+                state = -1;
+                break;
+            }
+            
+            state++;
+            last_state = state;
+
+            break;
+        }
+    }    
+
+    *received_plot_length = last_state + 1;
+    return 0;
+}
+
+int send_supervision_plot(int fd, char control_field) {
+    unsigned char* receiver_response = create_supervision_plot(control_field);
+    write(fd, receiver_response, 5);
+    free(receiver_response);  
+
+    return 0;  
+}
+
+unsigned char* retrieve_data(unsigned char *information_plot, int plot_length, int *data_length) {
+    printf("AHAHAHAHA %d", *data_length);
+    *data_length = plot_length - 6;
+    
+    unsigned char *data = (unsigned char*)malloc(*data_length);
+    
+    data = memcpy(data, &information_plot[4], *data_length);
+
+    return data;
+}
+
+unsigned char retrieve_bcc2(unsigned char *information_plot, int plot_length) {
+    return information_plot[plot_length - 2];
+}
+
+unsigned char calculate_bcc2(unsigned char *data, int data_length) {
+    unsigned char bcc2 = 0;
+
+    for(int i = 0; i < data_length; i++) {
+        bcc2 ^= data[i];
+    }
+
+    return bcc2;
+}
+
+
 int send_plot(int fd, unsigned char* plot) {
     return 0;
+}
+
+void print_string(unsigned char *string, int length) {
+    for(int i = 0; i < length; i++) {
+        printf("%x ", string[i]);
+    }
+    printf("\n");
 }
