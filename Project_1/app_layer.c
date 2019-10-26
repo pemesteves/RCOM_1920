@@ -1,5 +1,6 @@
 #include "app_layer.h"
 #include "files.h"
+#include "link_layer.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -8,14 +9,12 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define START 2
-#define END 3
 
 int sequence_number = 0;
 
 int data_packet(char * string, char * packet) {
     packet = malloc(4 + sizeof(string)/sizeof(string[0]));
-    packet[0] = 1;
+    packet[0] = DATA;
     packet[1] = sequence_number;
     sequence_number++;
     packet[2] = (sizeof(string)/sizeof(string[0]))/256;
@@ -25,8 +24,20 @@ int data_packet(char * string, char * packet) {
 
 }
 
-int control_packet(char * packet, char * file_name, int control){
+int control_packet(char * file_name, char control, char * packet){
+	packet = malloc(8 + sizeof(file_name)/sizeof(file_name[0]));
     packet[0] = control;
-    packet[1] = get_file_size(file_name);
-    memcpy(packet + 2, file_name, sizeof(file_name)/sizeof(file_name[0]));
+	packet[1] = 0;
+    packet[2] = sizeof(int);
+    packet[3] = (char)(get_file_size(file_name) % 0x0010);
+    packet[4] = (char)(get_file_size(file_name) / 0x0010 % 0x0010);
+    packet[5] = (char)(get_file_size(file_name) / 0x0100 % 0x0010);
+    packet[6] = (char)(get_file_size(file_name) / 0x1000);
+	packet[7] = 1;
+	packet[8] = sizeof(sizeof(file_name)/sizeof(file_name[0]));
+    strcpy(packet + 9, file_name);
+	return 0;
 }
+
+
+

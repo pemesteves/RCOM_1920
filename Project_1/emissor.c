@@ -25,6 +25,8 @@ int main(int argc, char** argv)
 
 	//File variables
 	int fd, num_bytes_read;
+
+	char * file_name = "./pinguim.gif";
 	
 	struct termios oldtio;
 
@@ -50,6 +52,7 @@ int main(int argc, char** argv)
 	int data_length = 100;
 	unsigned char *data = (unsigned char*)malloc(data_length*sizeof(char)+1);
 	
+
 	for(;;){
 		memset(data, '\0', data_length);
 		num_bytes_read = read_file(fd, data, data_length);
@@ -65,11 +68,42 @@ int main(int argc, char** argv)
 
 		printf("Sending message...\n");
 
-		if(llwrite(serial_fd, data, num_bytes_read) < 0){
+		data_packet(file_name, data_pkt);
+
+		char * control_start, *control_end, *data_pkt;
+		control_packet(file_name, START, control_start);
+
+		if(llwrite(serial_fd, control_start, sizeof(control_start)/sizeof(control_start[0])) < 0){
 			printf("llwrite error\n");
 			return -1;
 		}
+		else {
+			printf("Sent start control packet\n");
+		}
+
+		if(llwrite(serial_fd, data_pkt, 4+num_bytes_read) < 0){
+			printf("llwrite error\n");
+			return -1;
+		}
+		else {
+			printf("Sent data packet\n");
+		}
+		control_packet(file_name, END, control_end);
+
+		if(llwrite(serial_fd, control_end, 9+sizeof(file_name)/sizeof(file_name[0])) < 0){
+			printf("llwrite error\n");
+			return -1;
+		}
+		else {
+			printf("Sent end control packet\n");
+		}
+
 	}
+	
+
+
+
+
 	free(data);
 
 	//sleep(2);
