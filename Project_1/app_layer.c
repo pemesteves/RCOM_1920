@@ -1,4 +1,5 @@
 #include "app_layer.h"
+#include "files.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
