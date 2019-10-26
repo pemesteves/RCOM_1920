@@ -1,9 +1,17 @@
+# Ignore everything
 *
+
+# Don't ignore directories
 !/**/
-!*.*
 
-# Object files
-*.o
+# Don't ignore files with extensions
+!**/*.*
 
-# Executables
-*.out
+# Don't ignore Makefile
+!**/Makefile
+
+# Ignore object files
+**/*.o
+
+# Ignore executables
+**/*.out
