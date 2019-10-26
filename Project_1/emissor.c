@@ -68,9 +68,10 @@ int main(int argc, char** argv)
 
 		printf("Sending message...\n");
 
+		char * control_start, *control_end, *data_pkt;
+
 		data_packet(file_name, data_pkt);
 
-		char * control_start, *control_end, *data_pkt;
 		control_packet(file_name, START, control_start);
 
 		if(llwrite(serial_fd, control_start, sizeof(control_start)/sizeof(control_start[0])) < 0){
