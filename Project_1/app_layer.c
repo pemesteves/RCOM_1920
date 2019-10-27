@@ -2,6 +2,7 @@
 #include "files.h"
 #include "link_layer.h"
 
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -73,7 +74,7 @@ int read_packet(char * packet, char * file_name, unsigned int * file_size, char 
         unsigned int length = packet[2] + (packet[3] << 8);
         content = malloc(length);
         for (int i = 0; i < length ; i++) {
-            content = packet[4 + j];
+            content = packet[4 + i];
         }
     }
     else {
