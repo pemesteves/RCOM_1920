@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "link_layer.h"
+#include "app_layer.h"
 
 #define BAUDRATE B38400
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
@@ -26,6 +27,7 @@ int main(int argc, char** argv)
   int fd, res;
   struct termios oldtio,newtio;
   char buf[5];
+  char * file_name, * file_size, *content;
 
   if ( (argc < 2) ||
       ((strcmp("/dev/ttyS0", argv[1])!=0) &&
@@ -52,6 +54,13 @@ int main(int argc, char** argv)
     for(int i = 0; i < data_size; i++) {
       printf("%c", data[i]);
     }
+
+    read_packet(data, file_name, file_size, content);
+    printf("\nRead packet\n");
+    printf("File size: %d\n", file_size);
+    printf("File name: %d\n", file_name);
+    printf("Content: %d\n", content);
+
     printf("\n");
   }
 
@@ -62,5 +71,8 @@ int main(int argc, char** argv)
     return -1;
   }
 
+  create_file(file_name, file_size, content);
+
   return 0;
+
 }
