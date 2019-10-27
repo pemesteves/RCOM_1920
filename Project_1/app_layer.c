@@ -12,14 +12,14 @@
 
 int sequence_number = 0;
 
-int data_packet(char * string, char * packet) {
+int data_packet(int data_lenght, char * data, char * packet) {
     packet[0] = DATA;
     packet[1] = sequence_number;
     sequence_number++;
-    packet[2] = (sizeof(string)/sizeof(string[0]))/256;
-    packet[3] = (sizeof(string)/sizeof(string[0]))%256;
+    packet[2] = data_lenght/256;
+    packet[3] = data_lenght%256;
 
-    if(memcpy(packet + 4, string, sizeof(string)/sizeof(string[0])) == -1)
+    if(memcpy(&packet[4], data, data_lenght) == -1)
         return -1;
 
     return 0;

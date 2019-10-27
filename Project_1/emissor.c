@@ -50,6 +50,7 @@ int main(int argc, char** argv)
 	printf("Opened file %s\n\n", "./pinguim.gif");
 
 	int data_length = 100;
+	int data_packet_length = 0;
 	unsigned char *data = (unsigned char*)malloc(data_length*sizeof(char)+1);
 	
 	unsigned char *data_pkt;
@@ -67,20 +68,20 @@ int main(int argc, char** argv)
 		}
 		printf("Read %i bytes from file %s\n\n", num_bytes_read, "./pinguim.gif");
 
-		printf("Sending message...\n");
-
-   		data_pkt = (unsigned char*)malloc(num_bytes_read+4*sizeof(char));
-		if(data_packet(data, data_pkt)){
+		data_packet_length = 4 + num_bytes_read;
+   		data_pkt = (unsigned char*)malloc(data_packet_length);
+		if(data_packet(num_bytes_read, data, data_pkt)){
 			printf("Error while creating the data packet\n\n");
 			return -1;
 		}
 
-		if(llwrite(serial_fd, data_pkt, 4+num_bytes_read) < 0){
+		printf("Sending message...\n");
+		if(llwrite(serial_fd, data_pkt, data_packet_length) < 0){
 			printf("llwrite error\n");
 			return -1;
 		}
 		else {
-			printf("Sent data packet\n");
+			printf("Sent data packet\n\n");
 		}
 
 		free(data_pkt);

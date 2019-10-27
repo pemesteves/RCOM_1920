@@ -6,7 +6,7 @@
 #define NAME 1
 
 
-int data_packet(char * string, char * packet);
+int data_packet(int data_lenght, char * data, char * packet);
 
 int control_packet(char * file_name, char control, char * packet);
 
