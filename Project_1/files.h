@@ -1,6 +1,8 @@
+#include <sys/types.h>
+
 int file_exist(char* file_name);
 
-int get_file_size(char* file_name);
+off_t get_file_size(char* file_name);
 
 /**
  * 

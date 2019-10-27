@@ -11,7 +11,7 @@ int file_exist(char* file_name){
     return stat (file_name, &st);
 }
 
-int get_file_size(char* file_name){
+off_t get_file_size(char* file_name){
     struct stat st;
     if(stat(file_name, &st) < 0)
         return -1;

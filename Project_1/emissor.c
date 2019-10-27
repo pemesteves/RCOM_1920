@@ -35,19 +35,39 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	if(file_exist("./pinguim.gif")){
-		printf("File %s doesn't exist!!!\n\n", "./pinguim.gif");
+	if(file_exist(file_name)){
+		printf("File %s doesn't exist!!!\n\n", file_name);
 		return -1;
 	}
 	else{
-		printf("File %s exist\n\n", "./pinguim.gif");
+		printf("File %s exist\n\n", file_name);
 	}
 
-	if((fd = open_file("./pinguim.gif")) < 0){
-		printf("Can't open %s!\n\n", "./pinguim.gif");
+	if((fd = open_file(file_name)) < 0){
+		printf("Can't open %s!\n\n", file_name);
 		return -1;
 	}
-	printf("Opened file %s\n\n", "./pinguim.gif");
+	printf("Opened file %s\n\n", file_name);
+	
+	unsigned char* ctrl_packet;
+	if(control_packet(file_name, START, ctrl_packet) < 0){
+		printf("Error in start control_packet\n\n");
+		return -1;
+	}	
+	printf("ola\n");
+	for(int i = 0; i < sizeof(ctrl_packet)/sizeof(ctrl_packet[0]); i++){
+		printf("%x ", ctrl_packet[i]);
+	}
+	printf("\n");
+	printf("Sending start control packet...\n");
+	if(llwrite(serial_fd, ctrl_packet, sizeof(ctrl_packet)/sizeof(ctrl_packet[0])) < 0){
+		printf("llwrite error\n");
+		return -1;
+	}
+	else {
+		printf("Sent start control packet\n\n");
+	}
+	free(ctrl_packet);
 
 	int data_length = 100;
 	int data_packet_length = 0;
@@ -86,9 +106,22 @@ int main(int argc, char** argv)
 
 		free(data_pkt);
 	}
-	
-
 	free(data);
+
+	if(control_packet(file_name, END, ctrl_packet) < 0){
+		printf("Error in end control_packet\n\n");
+		return -1;
+	}	
+	
+	printf("Sending end control packet...\n");
+	if(llwrite(serial_fd, ctrl_packet, sizeof(ctrl_packet)/sizeof(ctrl_packet[0])) < 0){
+		printf("llwrite error\n");
+		return -1;
+	}
+	else {
+		printf("Sent end control packet\n\n");
+	}
+	free(ctrl_packet);
 
 	//sleep(2);
 

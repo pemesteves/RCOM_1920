@@ -12,31 +12,68 @@
 
 int sequence_number = 0;
 
-int data_packet(int data_lenght, char * data, char * packet) {
+unsigned char *strrev(unsigned char *str);
+
+int data_packet(int data_length, char * data, char * packet) {
     packet[0] = DATA;
     packet[1] = sequence_number;
     sequence_number++;
-    packet[2] = data_lenght/256;
-    packet[3] = data_lenght%256;
+    packet[2] = data_length/256;
+    packet[3] = data_length%256;
 
-    if(memcpy(&packet[4], data, data_lenght) == -1)
+    if(memcpy(&packet[4], data, data_length) == -1)
         return -1;
 
     return 0;
 }
 
 int control_packet(char * file_name, char control, char * packet){
-	packet = malloc(8 + sizeof(file_name)/sizeof(file_name[0]));
-    packet[0] = control;
-	packet[1] = 0;
-    packet[2] = sizeof(int);
-    packet[3] = (char)(get_file_size(file_name) % 0x0010);
-    packet[4] = (char)(get_file_size(file_name) / 0x0010 % 0x0010);
-    packet[5] = (char)(get_file_size(file_name) / 0x0100 % 0x0010);
-    packet[6] = (char)(get_file_size(file_name) / 0x1000);
-	packet[7] = 1;
-	packet[8] = (char)(sizeof(file_name)/sizeof(file_name[0]));
-    strcpy(packet + 9, file_name);
+	int file_name_size = sizeof(file_name)/sizeof(file_name[0]);
+    int packet_size = 5*sizeof(unsigned char)+file_name_size*sizeof(unsigned char);
+    packet = (unsigned char*)malloc(packet_size); //Allocation of space to the C, T1, L1, T2, L2 and V2 fields
+    if(packet == NULL){
+        printf("Error in malloc\n\n");
+        return -1;
+    }
+    packet[0] = control; //Control octet: 2 - start packet; 3 - end packet
+	
+    packet[1] = 0; // T1 - file size
+
+    off_t file_size =  get_file_size(file_name);
+
+    int v1_length = 0;
+    char* v1 = NULL;
+    do{
+        v1_length++;
+        v1 = realloc(v1, v1_length);
+        v1[v1_length-1] = (unsigned char)file_size%256;
+
+        off_t offset = file_size/256;
+        if(offset == 0)
+            break;
+        file_size = offset;
+    }while(1);
+
+    v1 = strrev(v1); //Reverse length
+    
+    packet[2] = v1_length;
+    packet_size += v1_length;
+    packet = realloc(packet, packet_size);
+
+    if(memcpy(&packet[3], v1, v1_length) == NULL){
+        printf("Error in memcpy\n");
+        return -1;
+    }
+    
+    int t2_position = 3 + v1_length;
+
+    packet[t2_position] = 1; //T2 - file name
+	packet[t2_position+1] = (unsigned char)file_name_size;
+	if(memcpy(&packet[t2_position+2], file_name, file_name_size) == NULL){
+        printf("Error in memcpy\n");
+        return -1;
+    }
+    
 	return 0;
 }
 
@@ -87,7 +124,19 @@ int read_packet(char * packet, char * file_name, unsigned int * file_size, char 
 
 }
 
+unsigned char *strrev(unsigned char *str)
+{
+      char *p1, *p2;
 
-
+      if (! str || ! *str)
+            return str;
+      for (p1 = str, p2 = str + strlen(str) - 1; p2 > p1; ++p1, --p2)
+      {
+            *p1 ^= *p2;
+            *p2 ^= *p1;
+            *p1 ^= *p2;
+      }
+      return str;
+}
 
 
