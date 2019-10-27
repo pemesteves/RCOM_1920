@@ -1,6 +1,5 @@
 #include "app_layer.h"
 #include "files.h"
-#include "link_layer.h"
 
 
 #include <sys/types.h>
@@ -14,15 +13,16 @@
 int sequence_number = 0;
 
 int data_packet(char * string, char * packet) {
-    packet = malloc(4 + sizeof(string)/sizeof(string[0]));
     packet[0] = DATA;
     packet[1] = sequence_number;
     sequence_number++;
     packet[2] = (sizeof(string)/sizeof(string[0]))/256;
     packet[3] = (sizeof(string)/sizeof(string[0]))%256;
-    memcpy(packet + 4, string, sizeof(string)/sizeof(string[0]));
-    return 0;
 
+    if(memcpy(packet + 4, string, sizeof(string)/sizeof(string[0])) == -1)
+        return -1;
+
+    return 0;
 }
 
 int control_packet(char * file_name, char control, char * packet){

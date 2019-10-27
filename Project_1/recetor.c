@@ -41,7 +41,8 @@ int main(int argc, char** argv)
     printf("\nError in llopen\n");
     return -1;
   }
-  for(int i = 0; i < 3; i++){
+
+  for(;;){
     char data[128];
     int data_size = 0;
     
@@ -55,11 +56,11 @@ int main(int argc, char** argv)
       printf("%c", data[i]);
     }
 
-    read_packet(data, file_name, file_size, content);
-    printf("\nRead packet\n");
-    printf("File size: %d\n", file_size);
-    printf("File name: %d\n", file_name);
-    printf("Content: %d\n", content);
+    //read_packet(data, file_name, file_size, content);
+    //printf("\nRead packet\n");
+    //printf("File size: %d\n", file_size);
+    //printf("File name: %d\n", file_name);
+    //printf("Content: %d\n", content);
 
     printf("\n");
   }
@@ -71,7 +72,7 @@ int main(int argc, char** argv)
     return -1;
   }
 
-  create_file(file_name, file_size, content);
+  //create_file(file_name, file_size, content);
 
   return 0;
 

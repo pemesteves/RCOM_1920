@@ -52,7 +52,8 @@ int main(int argc, char** argv)
 	int data_length = 100;
 	unsigned char *data = (unsigned char*)malloc(data_length*sizeof(char)+1);
 	
-
+	unsigned char *data_pkt;
+	
 	for(;;){
 		memset(data, '\0', data_length);
 		num_bytes_read = read_file(fd, data, data_length);
@@ -68,18 +69,10 @@ int main(int argc, char** argv)
 
 		printf("Sending message...\n");
 
-		char * control_start, *control_end, *data_pkt;
-
-		data_packet(file_name, data_pkt);
-
-		control_packet(file_name, START, control_start);
-
-		if(llwrite(serial_fd, control_start, sizeof(control_start)/sizeof(control_start[0])) < 0){
-			printf("llwrite error\n");
+   		data_pkt = (unsigned char*)malloc(num_bytes_read+4*sizeof(char));
+		if(data_packet(data, data_pkt)){
+			printf("Error while creating the data packet\n\n");
 			return -1;
-		}
-		else {
-			printf("Sent start control packet\n");
 		}
 
 		if(llwrite(serial_fd, data_pkt, 4+num_bytes_read) < 0){
@@ -89,21 +82,10 @@ int main(int argc, char** argv)
 		else {
 			printf("Sent data packet\n");
 		}
-		control_packet(file_name, END, control_end);
 
-		if(llwrite(serial_fd, control_end, 9+sizeof(file_name)/sizeof(file_name[0])) < 0){
-			printf("llwrite error\n");
-			return -1;
-		}
-		else {
-			printf("Sent end control packet\n");
-		}
-
+		free(data_pkt);
 	}
 	
-
-
-
 
 	free(data);
 
