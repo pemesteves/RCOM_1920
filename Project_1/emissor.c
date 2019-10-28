@@ -29,12 +29,11 @@ int main(int argc, char** argv)
 	char * file_name = "./pinguim.gif";
 	
 	struct termios oldtio;
-
 	if((serial_fd = llopen(argv[1], TRANSMITTER, &oldtio)) < 0){
 		printf("llopen error\n");
 		return -1;
 	}
-
+	
 	if(file_exist(file_name)){
 		printf("File %s doesn't exist!!!\n\n", file_name);
 		return -1;
@@ -49,8 +48,9 @@ int main(int argc, char** argv)
 	}
 	printf("Opened file %s\n\n", file_name);
 	
-	unsigned char* ctrl_packet;
-	if(control_packet(file_name, START, ctrl_packet) < 0){
+	int control_packet_length = 5*sizeof(unsigned char)+(sizeof(file_name)/sizeof(file_name[0]))*sizeof(unsigned char);
+	unsigned char* ctrl_packet = (unsigned char*)malloc(control_packet_length);
+	if(control_packet(file_name, START, ctrl_packet, control_packet_length) < 0){
 		printf("Error in start control_packet\n\n");
 		return -1;
 	}	
@@ -67,7 +67,8 @@ int main(int argc, char** argv)
 	else {
 		printf("Sent start control packet\n\n");
 	}
-	free(ctrl_packet);
+
+	memset(ctrl_packet, '\0', control_packet_length);
 
 	int data_length = 100;
 	int data_packet_length = 0;
@@ -108,7 +109,7 @@ int main(int argc, char** argv)
 	}
 	free(data);
 
-	if(control_packet(file_name, END, ctrl_packet) < 0){
+	if(control_packet(file_name, END, ctrl_packet, control_packet_length) < 0){
 		printf("Error in end control_packet\n\n");
 		return -1;
 	}	

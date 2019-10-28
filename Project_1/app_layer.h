@@ -8,6 +8,6 @@
 
 int data_packet(int data_length, char * data, char * packet);
 
-int control_packet(char * file_name, char control, char * packet);
+int control_packet(char * file_name, char control, char * packet, int packet_size);
 
 int read_packet(char * packet, char * file_name, unsigned int * file_size, char * content);

@@ -27,10 +27,9 @@ int data_packet(int data_length, char * data, char * packet) {
     return 0;
 }
 
-int control_packet(char * file_name, char control, char * packet){
+int control_packet(char * file_name, char control, char * packet, int packet_size){
 	int file_name_size = sizeof(file_name)/sizeof(file_name[0]);
-    int packet_size = 5*sizeof(unsigned char)+file_name_size*sizeof(unsigned char);
-    packet = (unsigned char*)malloc(packet_size); //Allocation of space to the C, T1, L1, T2, L2 and V2 fields
+
     if(packet == NULL){
         printf("Error in malloc\n\n");
         return -1;

@@ -148,12 +148,13 @@ int llopen(char *gate, int flag, struct termios *oldtio)
     struct termios newtio;
     char buf[255];
 
-    if ((strcmp("/dev/ttyS0", gate) != 0) && (strcmp("/dev/ttyS1", gate) != 0) && (strcmp("/dev/ttyS2", gate) != 0))    //S2 para teste em VB
+    if ((strcmp("/dev/ttyS0", gate) != 0) && (strcmp("/dev/ttyS1", gate) != 0) && (strcmp("/dev/ttyS2", gate) != 0) //S2 para teste em VB
+         && (strcmp("/dev/ttyS4", gate) != 0))    
         {
             printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
             return -1;
         }
-
+        
     /*
     Open serial port device for reading and writing and not as controlling tty
     because we don't want to get killed if linenoise sends CTRL-C.
