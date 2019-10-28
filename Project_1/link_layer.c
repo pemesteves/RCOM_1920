@@ -22,6 +22,7 @@
 #define ESCAPE      0x7D
 #define A           0x03
 #define C_SET       0x03
+#define C_DISC      0x0B
 #define C_UA        0x07
 #define C_RR        0x05
 #define C_SEND_0    0x00
@@ -227,7 +228,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
             if ((size_written = write(fd, SET, 5)) < 0)
             {
                 perror("write");
-                exit(-1);
+                return -1;
             }
 
             printf("%d bytes written: ", size_written);
@@ -553,15 +554,206 @@ int llread(int fd, char *buffer)
 
 int llclose(int fd, struct termios *oldtio)
 {
+    int state = 0;
+    if (flag == TRANSMITTER)
+    {
+        unsigned char SET[5]; //[FLAG, A, C_DISC, BCC, FLAG]
+
+        while (state < 5)
+        {
+            SET[0] = FLAG;
+            SET[1] = A;
+            SET[2] = C_DISC;
+            SET[3] = SET[1] ^ SET[2]; //BCC
+            SET[4] = FLAG;
+
+            int size_written;
+            //Send DISC
+            if ((size_written = write(fd, SET, 5)) < 0)
+            {
+                perror("write");
+                return -1;
+            }
+
+            printf("%d bytes written: ", size_written);
+            printf("%x %x %x %x %x\n", SET[0], SET[1], SET[2], SET[3], SET[4]);
+
+            memset(SET, '\0', sizeof(SET));
+
+            state = 0;
+            //Receive DISC
+            while (state != 5) /* loop for input */
+            {
+
+                read(fd, &SET[state], 1); /* returns after 5 chars have been input */
+                switch (state)
+                {
+                case 0:
+                    if (SET[state] == FLAG)
+                        state = 1;
+                    break;
+                case 1:
+                    if (SET[state] == A)
+                        state = 2;
+                    else if (SET[state] == FLAG)
+                        state = 1;
+                    else
+                        state = 0;
+                    break;
+                case 2:
+                    if (SET[state] == C_DISC)
+                        state = 3;
+                    else if (SET[state] == FLAG)
+                        state = 1;
+                    else
+                        state = 0;
+                    break;
+                case 3:
+                    if (SET[state] == C_UA ^ A)
+                        state = 4;
+                    else
+                        state = 0;
+                    break;
+                case 4:
+                    if (SET[state] == FLAG)
+                        state = 5;
+                    else
+                        state = 0;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+
+        //Send UA
+        SET[0] = FLAG;
+        SET[1] = A;
+        SET[2] = C_DISC;
+        SET[3] = SET[1] ^ SET[2]; //BCC
+        SET[4] = FLAG;
+
+        int size_written;
+        if ((size_written = write(fd, SET, 5)) < 0)
+        {
+            perror("write");
+            return -1;
+        }
+    }
+    else
+    {
+        //Receive DISC
+        while (state != 5)
+        {                             /* loop for input */
+            read(fd, &buf[state], 1); /* returns after 5 chars have been input */
+            switch (state)
+            {
+            case 0:
+                if (buf[state] == FLAG)
+                    state = 1;
+                break;
+            case 1:
+                if (buf[state] == A)
+                    state = 2;
+                else if (buf[state] == FLAG)
+                    state = 1;
+                else
+                    state = 0;
+                break;
+            case 2:
+                if (buf[state] == C_DISC)
+                    state = 3;
+                else if (buf[state] == FLAG)
+                    state = 1;
+                else
+                    state = 0;
+                break;
+            case 3:
+                if (buf[state] == C_DISC ^ A)
+                    state = 4;
+                else
+                    state = 0;
+                break;
+            case 4:
+                if (buf[state] == FLAG)
+                    state = 5;
+                else
+                    state = 0;
+                break;
+            default:
+                break;
+            }
+        }
+
+        unsigned char DISC[5];
+
+        DISC[0] = FLAG;
+        DISC[1] = A;
+        DISC[2] = C_DISC;
+        DISC[3] = DISC[1] ^ DISC[2]; //BCC1
+        DISC[4] = FLAG;
+
+        //Send DISC
+        int size_written = write(fd, DISC, 5);
+        printf("%d bytes written: ", size_written);
+        printf("%x %x %x %x %x\n", DISC[0], DISC[1], DISC[2], DISC[3], DISC[4]);
+
+        state = 0;
+        //Receive UA
+        while (state != 5)
+        {                             /* loop for input */
+            read(fd, &buf[state], 1); /* returns after 5 chars have been input */
+            switch (state)
+            {
+            case 0:
+                if (buf[state] == FLAG)
+                    state = 1;
+                break;
+            case 1:
+                if (buf[state] == A)
+                    state = 2;
+                else if (buf[state] == FLAG)
+                    state = 1;
+                else
+                    state = 0;
+                break;
+            case 2:
+                if (buf[state] == C_UA)
+                    state = 3;
+                else if (buf[state] == FLAG)
+                    state = 1;
+                else
+                    state = 0;
+                break;
+            case 3:
+                if (buf[state] == C_UA ^ A)
+                    state = 4;
+                else
+                    state = 0;
+                break;
+            case 4:
+                if (buf[state] == FLAG)
+                    state = 5;
+                else
+                    state = 0;
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
+
     if (tcsetattr(fd, TCSANOW, oldtio) == -1)
     {
         perror("tcsetattr");
-        return 1;
+        return -1;
     }
 
     printf("\nOld termios structure set at llclose\n");
 
     close(fd);
+    return 0;
 }
 
 void atende(int signal)
