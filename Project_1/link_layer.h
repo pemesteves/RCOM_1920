@@ -13,7 +13,7 @@ int llwrite(int fd, char * buffer, int length);
 
 int llread(int fd, char * buffer);
 
-int llclose(int fd, struct termios *oldtio);
+int llclose(int fd, struct termios *oldtio, int flag);
 
 
 /* Auxiliary Functions */

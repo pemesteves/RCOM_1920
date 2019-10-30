@@ -552,7 +552,7 @@ int llread(int fd, char *buffer)
     return -1;
 }
 
-int llclose(int fd, struct termios *oldtio)
+int llclose(int fd, struct termios *oldtio, int flag)
 {
     int state = 0;
     if (flag == TRANSMITTER)
@@ -609,7 +609,7 @@ int llclose(int fd, struct termios *oldtio)
                         state = 0;
                     break;
                 case 3:
-                    if (SET[state] == C_UA ^ A)
+                    if (SET[state] == C_DISC ^ A)
                         state = 4;
                     else
                         state = 0;
@@ -629,7 +629,7 @@ int llclose(int fd, struct termios *oldtio)
         //Send UA
         SET[0] = FLAG;
         SET[1] = A;
-        SET[2] = C_DISC;
+        SET[2] = C_UA;
         SET[3] = SET[1] ^ SET[2]; //BCC
         SET[4] = FLAG;
 
@@ -642,6 +642,7 @@ int llclose(int fd, struct termios *oldtio)
     }
     else
     {
+        char buf[255];
         //Receive DISC
         while (state != 5)
         {                             /* loop for input */
@@ -743,6 +744,8 @@ int llclose(int fd, struct termios *oldtio)
         }
     }
 
+    if(flag == TRANSMITTER)
+        sleep(2);
 
     if (tcsetattr(fd, TCSANOW, oldtio) == -1)
     {

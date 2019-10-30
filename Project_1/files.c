@@ -48,13 +48,30 @@ int close_file(int fd){
     return 0;
 }
 
+int create_file(char* file_name){
+    int fd;
+    if((fd = open(file_name, O_WRONLY | O_APPEND | O_CREAT | O_TRUNC, 0750)) < 0){
+        perror("open file\n");
+        return -1;
+    }
 
-int create_file(char * file_name, unsigned int file_size, char * content) {
+    return fd;
+}
+
+int write_file(int fd, unsigned char* content, unsigned int content_size){
+    if(write(fd, content, content_size) < 0){
+        perror("write");
+        return -1;
+    }
+    return 0;
+}
+
+/*int create_file(char *file_name, unsigned int file_size, char *content) {
     FILE *file = fopen(file_name, "wb+");
     fwrite((void *)content, 1, file_size, file);
     printf("New file created\n");
     fclose(file);
     return 0;
-}
+}*/
 
 

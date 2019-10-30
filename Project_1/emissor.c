@@ -26,7 +26,8 @@ int main(int argc, char** argv)
 	//File variables
 	int fd, num_bytes_read;
 
-	char * file_name = "./pinguim.gif";
+	char * file_name = "pinguim.gif";
+	off_t file_size;
 	
 	struct termios oldtio;
 	if((serial_fd = llopen(argv[1], TRANSMITTER, &oldtio)) < 0){
@@ -48,19 +49,23 @@ int main(int argc, char** argv)
 	}
 	printf("Opened file %s\n\n", file_name);
 	
-	int control_packet_length = 5*sizeof(unsigned char)+(sizeof(file_name)/sizeof(file_name[0]))*sizeof(unsigned char);
+	int control_packet_length = 5*sizeof(unsigned char)+strlen(file_name);
+	int first_control_packet_length = control_packet_length;
+
 	unsigned char* ctrl_packet = (unsigned char*)malloc(control_packet_length);
-	if(control_packet(file_name, START, ctrl_packet, control_packet_length) < 0){
+	if(control_packet(file_name, START, ctrl_packet, &control_packet_length, &file_size) < 0){
 		printf("Error in start control_packet\n\n");
 		return -1;
 	}	
-	printf("ola\n");
-	for(int i = 0; i < sizeof(ctrl_packet)/sizeof(ctrl_packet[0]); i++){
+	
+	printf("START CONTROL PACKET: ");
+	for(int i = 0; i < control_packet_length; i++){
 		printf("%x ", ctrl_packet[i]);
 	}
 	printf("\n");
+	
 	printf("Sending start control packet...\n");
-	if(llwrite(serial_fd, ctrl_packet, sizeof(ctrl_packet)/sizeof(ctrl_packet[0])) < 0){
+	if(llwrite(serial_fd, ctrl_packet, control_packet_length) < 0){
 		printf("llwrite error\n");
 		return -1;
 	}
@@ -68,9 +73,7 @@ int main(int argc, char** argv)
 		printf("Sent start control packet\n\n");
 	}
 
-	memset(ctrl_packet, '\0', control_packet_length);
-
-	int data_length = 100;
+	int data_length = 256;
 	int data_packet_length = 0;
 	unsigned char *data = (unsigned char*)malloc(data_length*sizeof(char)+1);
 	
@@ -108,14 +111,19 @@ int main(int argc, char** argv)
 		free(data_pkt);
 	}
 	free(data);
-
-	if(control_packet(file_name, END, ctrl_packet, control_packet_length) < 0){
+	
+	if(control_packet(file_name, END, ctrl_packet, &control_packet_length, &file_size) < 0){
 		printf("Error in end control_packet\n\n");
 		return -1;
 	}	
-	
+	printf("END CONTROL PACKET: ");
+	for(int i = 0; i < control_packet_length; i++){
+		printf("%x ", ctrl_packet[i]);
+	}
+	printf("\n");
+
 	printf("Sending end control packet...\n");
-	if(llwrite(serial_fd, ctrl_packet, sizeof(ctrl_packet)/sizeof(ctrl_packet[0])) < 0){
+	if(llwrite(serial_fd, ctrl_packet, control_packet_length) < 0){
 		printf("llwrite error\n");
 		return -1;
 	}
@@ -124,14 +132,12 @@ int main(int argc, char** argv)
 	}
 	free(ctrl_packet);
 
-	//sleep(2);
-
 	if(close_file(fd) < 0){
 		printf("Can't close %s!\n\n", "./pinguim.gif");
 		return -1;
 	}
 
-	if(llclose(serial_fd,& oldtio)){
+	if(llclose(serial_fd,& oldtio, TRANSMITTER)){
 		printf("llclose error\n");
 		return -1;
 	}

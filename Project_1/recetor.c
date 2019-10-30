@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 #include "link_layer.h"
 #include "app_layer.h"
@@ -24,23 +25,20 @@ int main(int argc, char** argv)
   int current = 0;
   int max = 4;
 
-  int fd, res;
-  struct termios oldtio,newtio;
-  char buf[5];
-  char * file_name, * file_size, *content;
-
-  if ( (argc < 2) ||
-      ((strcmp("/dev/ttyS0", argv[1])!=0) &&
-       (strcmp("/dev/ttyS1", argv[1])!=0) &&
-       (strcmp("/dev/ttyS2", argv[1])!=0))) {
-    printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
-    exit(1);
-  }
+  int fd;
+  struct termios oldtio, newtio;
 
   if((fd = llopen(argv[1], RECEIVER, &oldtio)) < 0){
     printf("\nError in llopen\n");
     return -1;
   }
+
+  char *file_name, *content;
+  int received_fd;
+  off_t file_size;
+
+  bool received_end_packet = false;
+  bool received_start_packet = false;
 
   for(;;){
     char data[128];
@@ -56,23 +54,91 @@ int main(int argc, char** argv)
       printf("%c", data[i]);
     }
 
-    //read_packet(data, file_name, file_size, content);
-    //printf("\nRead packet\n");
-    //printf("File size: %d\n", file_size);
-    //printf("File name: %d\n", file_name);
-    //printf("Content: %d\n", content);
+    switch(data[0]) {
+      case DATA: // Data packet
+      {
+        if(!received_start_packet){
+          printf("First packet received should be the start control packet\n\n");
+          return -1;
+        }
+        
+        unsigned char *content;  
+        unsigned int content_size;
+        if(parse_data_packet(data, content, &content_size) < 0){
+          printf("Can't parse the data packet\n\n");
+          return -1;
+        }
+        if(write_file(received_fd, content, content_size) < 0){
+          printf("Can't write in the new file\n\n");
+          return -1;
+        }
+        free(content);
+        break;
+      }
+      
+      case START: // Start control packet
+      {
+        if(parse_control_packet(data, data_size, file_name, &file_size) < 0){
+          printf("Can't parse the starting control packet\n\n");
+          return -1;
+        }
+        if((received_fd = create_file(file_name)) < 0){
+          printf("Can't open the new file\n\n");
+          return -1;
+        }
+        received_start_packet = true;
+        break;
+      }
+
+      case END: // End control packet
+      {
+        if(!received_start_packet){
+          printf("First packet received should be the start control packet\n\n");
+          return -1;
+        }
+
+        char* new_file_name;
+        off_t new_file_size;
+        if(parse_control_packet(data, data_size, new_file_name, &new_file_size) < 0){
+          printf("Can't parse the starting control packet\n\n");
+          return -1;
+        }
+        
+        if(strcmp(new_file_name, file_name) != 0){
+          printf("Received wrong file name\n\n");
+          return -1;
+        }
+        if(new_file_name != file_size){
+          printf("Received wrong file size\n\n");
+          return -1;
+        }
+        if(get_file_size(file_name) != file_size){
+          printf("File size is different than expected\n\n");
+          return -1;
+        }
+        if(close_file(received_fd) < 0){
+          printf("Can't close file\n\n");
+          return -1;
+        }
+        free(new_file_name);
+        received_end_packet = true;
+        break;
+      }
+    }
+
+    if(received_end_packet)
+      break;
 
     printf("\n");
   }
 
+  free(file_name);
   sleep(2);
 
-  if(llclose(fd,& oldtio)){
+  if(llclose(fd, &oldtio, RECEIVER)){
 		printf("\nllclose error\n");
     return -1;
   }
-
-  //create_file(file_name, file_size, content);
 
   return 0;
 
