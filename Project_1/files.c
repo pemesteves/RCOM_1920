@@ -66,12 +66,5 @@ int write_file(int fd, unsigned char* content, unsigned int content_size){
     return 0;
 }
 
-/*int create_file(char *file_name, unsigned int file_size, char *content) {
-    FILE *file = fopen(file_name, "wb+");
-    fwrite((void *)content, 1, file_size, file);
-    printf("New file created\n");
-    fclose(file);
-    return 0;
-}*/
 
 

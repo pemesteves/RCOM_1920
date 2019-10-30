@@ -841,13 +841,13 @@ int receive_information_plot(int fd, unsigned char *received_plot, int *received
         switch (state)
         {
         case 0:
-            printf("State 0: %x\n",received_plot[state]);
+           // printf("State 0: %x\n",received_plot[state]);
             if (received_plot[state] == FLAG) {
                 state = 1;
             }
             break;
         case 1:
-            printf("State 1: %x\n",received_plot[state]);
+          //  printf("State 1: %x\n",received_plot[state]);
             if (received_plot[state] == A) {
                 state = 2;
             }
@@ -857,7 +857,7 @@ int receive_information_plot(int fd, unsigned char *received_plot, int *received
                 state = 0;
             break;
         case 2:
-            printf("State 2: %x\n",received_plot[state]);
+           // printf("State 2: %x\n",received_plot[state]);
             if (received_plot[state] == sender_field) {
                 state = 3;
             }
@@ -871,7 +871,7 @@ int receive_information_plot(int fd, unsigned char *received_plot, int *received
             }
             break;
         case 3:
-            printf("State 3: %x\n",received_plot[state]);
+           // printf("State 3: %x\n",received_plot[state]);
             if (received_plot[state] == A ^ sender_field)  {
                 state = 4;
             }
@@ -883,7 +883,7 @@ int receive_information_plot(int fd, unsigned char *received_plot, int *received
             break;
 
         default:
-            printf("Default: %x\n",received_plot[state]);
+           // printf("Default: %x\n",received_plot[state]);
             if(received_plot[state] == FLAG){
                 state = -1;
                 break;

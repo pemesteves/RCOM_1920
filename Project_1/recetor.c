@@ -41,18 +41,19 @@ int main(int argc, char** argv)
   bool received_start_packet = false;
 
   for(;;){
-    char data[128];
+    char data[256];
     int data_size = 0;
-    
+
     if((data_size = llread(fd, &data)) < 0){
       printf("\nError in llread\n");
       return -1;
     }
-
+/*
     printf("\nMessage received: ");
     for(int i = 0; i < data_size; i++) {
       printf("%c", data[i]);
     }
+*/
 
     switch(data[0]) {
       case DATA: // Data packet
@@ -61,10 +62,10 @@ int main(int argc, char** argv)
           printf("First packet received should be the start control packet\n\n");
           return -1;
         }
-        
-        unsigned char *content;  
+
+        unsigned char *content;
         unsigned int content_size;
-        if(parse_data_packet(data, content, &content_size) < 0){
+        if(parse_data_packet(data, &content, &content_size) < 0){
           printf("Can't parse the data packet\n\n");
           return -1;
         }
@@ -75,13 +76,16 @@ int main(int argc, char** argv)
         free(content);
         break;
       }
-      
+
       case START: // Start control packet
       {
-        if(parse_control_packet(data, data_size, file_name, &file_size) < 0){
+        if(parse_control_packet(data, data_size, &file_name, &file_size) < 0){
           printf("Can't parse the starting control packet\n\n");
           return -1;
         }
+        printf("File size: %ld \n\n", file_size);
+        printf("FILENAME: %s\n", file_name);
+
         if((received_fd = create_file(file_name)) < 0){
           printf("Can't open the new file\n\n");
           return -1;
@@ -99,16 +103,18 @@ int main(int argc, char** argv)
 
         char* new_file_name;
         off_t new_file_size;
-        if(parse_control_packet(data, data_size, new_file_name, &new_file_size) < 0){
+        if(parse_control_packet(data, data_size, &new_file_name, &new_file_size) < 0){
           printf("Can't parse the starting control packet\n\n");
           return -1;
         }
-        
+
         if(strcmp(new_file_name, file_name) != 0){
           printf("Received wrong file name\n\n");
           return -1;
         }
-        if(new_file_name != file_size){
+        if(new_file_size != file_size){
+          printf("NEW FILE SIZE: %ld\n", new_file_size);
+          printf("OLD FILE SIZEL: %ld\n", file_size);
           printf("Received wrong file size\n\n");
           return -1;
         }
@@ -133,7 +139,6 @@ int main(int argc, char** argv)
   }
 
   free(file_name);
-  sleep(2);
 
   if(llclose(fd, &oldtio, RECEIVER)){
 		printf("\nllclose error\n");

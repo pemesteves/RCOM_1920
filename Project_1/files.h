@@ -19,9 +19,6 @@ int read_file(int fd, unsigned char* string, int length);
  */
 int close_file(int fd);
 
-
-//int create_file(char * file_name, unsigned int file_size, char * content);
-
 int create_file(char* file_name);
 
 int write_file(int fd, unsigned char* content, unsigned int content_size);

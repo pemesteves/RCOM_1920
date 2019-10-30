@@ -73,59 +73,63 @@ int control_packet(char * file_name, char control, char * packet, int *packet_si
 	return 0;
 }
 
-int parse_data_packet(char *packet, unsigned char *content, unsigned int *content_size) {
+int parse_data_packet(unsigned char *packet, unsigned char **content, unsigned int *content_size) {
     if(packet[1] != sequence_number%256){
-        printf("Received data packet with wrong sequence number");
+        printf("Received data packet with wrong sequence number\n");
         sequence_number = 0;
         return -1;
     }
-    
+
     sequence_number++;
-    *content_size = packet[2] + (packet[3] << 8);
-    content = (unsigned char*)malloc((*content_size)*sizeof(unsigned char));
-    if(content == NULL){
+    *content_size = (packet[2] << 8) + packet[3];
+    *content = (unsigned char*)malloc((*content_size)*sizeof(unsigned char));
+    if(*content == NULL){
         printf("Error in malloc\n\n");
         return -1;
     }
-    
+
     for(unsigned int i = 0; i < *content_size; i++){
-        content[i] = packet[i+4];
+        (*content)[i] = packet[i+4];
     }
+
     return 0;
 }
 
-int parse_control_packet(char *packet, unsigned int packet_size, char *file_name, off_t *file_size) {
+int parse_control_packet(unsigned char *packet, unsigned int packet_size, char **file_name, off_t *file_size) {
+
     for (int i = 1; i < packet_size ; i++){
         if (packet[i] == SIZE) {
             i++;
-            
-            unsigned int length = packet[i];
-            *file_size = 0;               
-            for (int j = 1; j <= length ; j++) {
-                *file_size += (off_t) packet[i+j];
-                if(j != length)
-                    *file_size = (*file_size) << 8;
-            }
-                    
+
+            unsigned int length = (unsigned int) packet[i];
+            *file_size = 0;
+            for (int j = 1; j <= length ; j++)
+                *file_size = ((*file_size)<<8) + (off_t)packet[i+j];
+
             i += length;
         }
         else if (packet[i] == NAME) {
             i++;
 
-            unsigned int length = packet[i];
-            file_name = (char*)malloc(length);
-            if(file_name == NULL){
+            unsigned int length = (unsigned int) packet[i];
+
+            *file_name = (char*)malloc(length + 1);
+
+            if(*file_name == NULL){
                 printf("malloc error\n\n");
                 return -1;
             }
+
             for (int j = 1; j <= length ; j++) {
-                file_name[length - j] = packet[i+j];
+                (*file_name)[j-1] = packet[i+j];
             }
+
+            (*file_name)[length] = '\0';
 
             i += length;
         }
         else break;
-    }    
+    }
 
     return 0;
 }
