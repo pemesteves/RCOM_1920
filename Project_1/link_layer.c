@@ -1,4 +1,5 @@
 #include "link_layer.h"
+#include "macros.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -52,77 +53,7 @@ void atende(int signal);
  */
 void update_transm_nums();
 
-/**
- * Byte Stuffing
- */
-void byte_stuffing(unsigned char** string, int *length){
-    unsigned char* new_string = (unsigned char*)malloc(*length);
-    int new_length = *length;
-    new_string[0] = (*string)[0];
 
-    for(int i = 1, j=1; i < *length-1; i++, j++){
-        if((*string)[i] == FLAG){
-            new_length++;
-            new_string = realloc(new_string, new_length);
-            new_string[j] = ESCAPE;
-            j++;
-            new_string[j] = 0x5E;
-        }
-        else if((*string)[i] == ESCAPE){
-            new_length++;
-            new_string = realloc(new_string, new_length);
-            new_string[j] = ESCAPE;
-            j++;
-            new_string[j] = 0x5D;
-         }
-        else
-        {
-            new_string[j] = (*string)[i];
-        }
-    }
-    new_string[new_length-1] = (*string)[*length-1];
-
-
-    *string = realloc(*string, new_length);
-    memcpy(*string, new_string, new_length);
-    *length = new_length;
-    
-    free(new_string);
-}
-
-/**
- * Byte destuffing
- */
-void byte_destuffing(unsigned char** string, int *length){
-    unsigned char* new_string = (unsigned char*)malloc(*length);
-    int new_length = *length;
-
-    for(int i = 0, j = 0; i < *length; i++, j++){
-        if((*string)[i] == ESCAPE){
-            if((*string)[i+1] == 0x5e) {
-                new_string[j] = FLAG;
-            }
-            else {
-                new_string[j] = ESCAPE;
-            }
-
-            new_length--;
-
-            i++;
-        }
-        else
-        {
-            new_string[j] = (*string)[i];
-        }
-    }
-    //new_string = realloc(new_string, new_length);
-    //string = realloc(string, new_length);
-    memcpy(*string, new_string, new_length);
-
-    *length = new_length;
-
-    free(new_string);
-}
 
 
 
@@ -749,12 +680,83 @@ void update_transm_nums() {
 
 /****************************/
 /**                        **/
-/**  Auxiliary Functions   **/
+/**   Byte (De)Stuffing    **/
 /**                        **/
 /****************************/
 
+void byte_stuffing(unsigned char** string, int *length){
+    unsigned char* new_string = (unsigned char*)malloc(*length);
+    int new_length = *length;
+    new_string[0] = (*string)[0];
 
-/* Supervision Plots */
+    for(int i = 1, j=1; i < *length-1; i++, j++){
+        if((*string)[i] == FLAG){
+            new_length++;
+            new_string = realloc(new_string, new_length);
+            new_string[j] = ESCAPE;
+            j++;
+            new_string[j] = 0x5E;
+        }
+        else if((*string)[i] == ESCAPE){
+            new_length++;
+            new_string = realloc(new_string, new_length);
+            new_string[j] = ESCAPE;
+            j++;
+            new_string[j] = 0x5D;
+         }
+        else
+        {
+            new_string[j] = (*string)[i];
+        }
+    }
+    new_string[new_length-1] = (*string)[*length-1];
+
+
+    *string = realloc(*string, new_length);
+    memcpy(*string, new_string, new_length);
+    *length = new_length;
+    
+    free(new_string);
+}
+
+void byte_destuffing(unsigned char** string, int *length){
+    unsigned char* new_string = (unsigned char*)malloc(*length);
+    int new_length = *length;
+
+    for(int i = 0, j = 0; i < *length; i++, j++){
+        if((*string)[i] == ESCAPE){
+            if((*string)[i+1] == 0x5e) {
+                new_string[j] = FLAG;
+            }
+            else {
+                new_string[j] = ESCAPE;
+            }
+
+            new_length--;
+
+            i++;
+        }
+        else
+        {
+            new_string[j] = (*string)[i];
+        }
+    }
+    //new_string = realloc(new_string, new_length);
+    //string = realloc(string, new_length);
+    memcpy(*string, new_string, new_length);
+
+    *length = new_length;
+
+    free(new_string);
+}
+
+
+
+/****************************/
+/**                        **/
+/**   Supervision Plots    **/
+/**                        **/
+/****************************/
 
 unsigned char* create_supervision_plot(char control_field) {
     unsigned char *plot = malloc(SUPERVISION_PLOT_SIZE);
@@ -776,8 +778,72 @@ int send_supervision_plot(int fd, char control_field) {
     return 0;
 }
 
+int receive_supervision_plot(int fd, unsigned char *received_plot) {
+    //unsigned char *received_plot = (unsigned char*)malloc(MAX_SIZE * sizeof(unsigned char));
 
-/* Information Plots */
+    int state = START_STATE;
+    while (state != STOP_STATE)
+    {
+        if (alarm_flag == 1)
+        {
+            printf("Receiving error at retransmission number %d\n", counter - 1);
+            break;
+        }
+        read(fd, &received_plot[state], 1); /* returns after 5 chars have been input */
+        switch (state)
+        {
+        case START_STATE:
+            if (received_plot[state] == FLAG)
+                state = RECEIVED_FLAG;
+            break;
+
+        case RECEIVED_FLAG:
+            if (received_plot[state] == A)
+                state = RECEIVED_A;
+            else if (received_plot[state] == FLAG)
+                state = RECEIVED_FLAG;
+            else
+                state = START_STATE;
+            break;
+
+        case RECEIVED_A:
+            if (valid_control_field(received_plot[state]) == C_UA)
+                state = RECEIVED_CTRL;
+            else if (received_plot[state] == FLAG)
+                state = RECEIVED_FLAG;
+            else
+                state = START_STATE;
+            break;
+
+        case RECEIVED_CTRL:
+            if (received_plot[state] == received_plot[1] ^ received_plot[2])
+                state = CORRECT_BCC;
+            else
+                state = START_STATE;
+            break;
+
+        case CORRECT_BCC:
+            if (received_plot[state] == FLAG)
+                state = STOP_STATE;
+            else
+                state = START_STATE;
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    return 0;
+}
+
+
+
+/****************************/
+/**                        **/
+/**   Information Plots    **/
+/**                        **/
+/****************************/
 
 void create_information_plot(char control_field, char *data, int length, unsigned char* plot) {
     unsigned char BCC2 = 0;
@@ -800,7 +866,6 @@ int receive_information_plot(int fd, unsigned char *received_plot, int *received
 
     bool bcc1_wrong = false;
 
-    printf("\n");
     while (state != -1)
     {
         int num = read(fd, &received_plot[state], 1);
@@ -872,6 +937,35 @@ int receive_information_plot(int fd, unsigned char *received_plot, int *received
     return 0;
 }
 
+
+
+/****************************/
+/**                        **/
+/**     Control Field      **/
+/**                        **/
+/****************************/
+
+bool check_control_field(unsigned char *plot, unsigned char control_field) {
+    return plot[2] == control_field;
+}
+
+bool valid_control_field(unsigned char control_field) {
+    if(control_field == C_SET    || control_field == C_REJ_0  || control_field == C_REJ_1 ||
+       control_field == C_RR_0   || control_field == C_RR_1   || control_field == C_DISC  ||
+       control_field == C_SEND_0 || control_field == C_SEND_1 || control_field == C_UA     )
+       return 1;
+
+    return 0;
+}
+
+
+
+/****************************/
+/**                        **/
+/**  Retrieval Functions   **/
+/**                        **/
+/****************************/
+
 unsigned char* retrieve_data(unsigned char *information_plot, int plot_length, int *data_length) {
     *data_length = plot_length - 6;
 
@@ -897,7 +991,12 @@ unsigned char calculate_bcc2(unsigned char *data, int data_length) {
 }
 
 
-/* Serial port setup */
+
+/****************************/
+/**                        **/
+/**   Serial Port Setup    **/
+/**                        **/
+/****************************/
 
 int open_serial_port(const char* port) {
 	return open(port, O_RDWR | O_NOCTTY);
@@ -958,7 +1057,7 @@ int check_role(int flag) {
 }
 
 int check_serial_port(char *port) {
-    if ((strcmp("/dev/ttyS0", gate) != 0) && (strcmp("/dev/ttyS1", gate) != 0) && (strcmp("/dev/ttyS2", gate) != 0) && (strcmp("/dev/ttyS4", gate) != 0)) {
+    if ((strcmp("/dev/ttyS0", port) != 0) && (strcmp("/dev/ttyS1", port) != 0) && (strcmp("/dev/ttyS2", port) != 0) && (strcmp("/dev/ttyS4", port) != 0)) {
             return -1;
 
     return 0;
