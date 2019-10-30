@@ -41,7 +41,7 @@ int main(int argc, char** argv)
   bool received_start_packet = false;
 
   for(;;){
-    char data[256];
+    unsigned char data[256];
     int data_size = 0;
 
     if((data_size = llread(fd, &data)) < 0){

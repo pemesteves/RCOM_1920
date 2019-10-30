@@ -55,20 +55,20 @@ void update_transm_nums();
 /**
  * Byte Stuffing
  */
-void byte_stuffing(unsigned char* string, int *length){
+void byte_stuffing(unsigned char** string, int *length){
     unsigned char* new_string = (unsigned char*)malloc(*length);
     int new_length = *length;
-    new_string[0] = string[0];
+    new_string[0] = (*string)[0];
 
     for(int i = 1, j=1; i < *length-1; i++, j++){
-        if(string[i] == FLAG){
+        if((*string)[i] == FLAG){
             new_length++;
             new_string = realloc(new_string, new_length);
             new_string[j] = ESCAPE;
             j++;
             new_string[j] = 0x5E;
         }
-        else if(string[i] == ESCAPE){
+        else if((*string)[i] == ESCAPE){
             new_length++;
             new_string = realloc(new_string, new_length);
             new_string[j] = ESCAPE;
@@ -83,8 +83,8 @@ void byte_stuffing(unsigned char* string, int *length){
     new_string[new_length-1] = string[*length-1];
 
 
-    string = realloc(string, new_length);
-    memcpy(string, new_string, new_length);
+    *string = realloc(*string, new_length);
+    memcpy(*string, new_string, new_length);
     *length = new_length;
 
     printf("\n\n");
@@ -95,13 +95,13 @@ void byte_stuffing(unsigned char* string, int *length){
 /**
  * Byte destuffing
  */
-void byte_destuffing(char* string, int *length){
-    char* new_string = malloc(*length);
+void byte_destuffing(unsigned char** string, int *length){
+    unsigned char* new_string = (unsigned char*)malloc(*length);
     int new_length = *length;
 
     for(int i = 0, j = 0; i < *length; i++, j++){
-        if(string[i] == ESCAPE){
-            if(string[i+1] == 0x5e) {
+        if((*string)[i] == ESCAPE){
+            if((*string)[i+1] == 0x5e) {
                 new_string[j] = FLAG;
             }
             else {
@@ -114,12 +114,12 @@ void byte_destuffing(char* string, int *length){
         }
         else
         {
-            new_string[j] = string[i];
+            new_string[j] = (*string)[i];
         }
     }
     //new_string = realloc(new_string, new_length);
     //string = realloc(string, new_length);
-    string = memcpy(string, new_string, new_length);
+    memcpy(*string, new_string, new_length);
 
     *length = new_length;
 
@@ -150,12 +150,12 @@ int llopen(char *gate, int flag, struct termios *oldtio)
     char buf[255];
 
     if ((strcmp("/dev/ttyS0", gate) != 0) && (strcmp("/dev/ttyS1", gate) != 0) && (strcmp("/dev/ttyS2", gate) != 0) //S2 para teste em VB
-         && (strcmp("/dev/ttyS4", gate) != 0))    
+         && (strcmp("/dev/ttyS4", gate) != 0))
         {
             printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
             return -1;
         }
-        
+
     /*
     Open serial port device for reading and writing and not as controlling tty
     because we don't want to get killed if linenoise sends CTRL-C.
@@ -366,13 +366,13 @@ int llwrite(int fd, char *buffer, int length)
     printf("Sender: %x; receiver: %x\n", sender_field, receiver_ready_field);
 
     void *sigalrm_handler = signal(SIGALRM, atende);
-    
-    int plot_length = length + 6; 
+
+    int plot_length = length + 6;
     unsigned char *plot = malloc(plot_length * sizeof(char));
 
     create_information_plot(sender_field, buffer, length, plot);
-       
-    byte_stuffing(plot, &plot_length);
+
+    byte_stuffing(&plot, &plot_length);
 
     int size_written;
     unsigned char received_char;
@@ -504,7 +504,7 @@ int llread(int fd, char *buffer)
     printf("Information plot %d\n\n", information_plot_counter);
     information_plot_counter++;
 
-    unsigned char received_plot[256];
+    unsigned char* received_plot = (unsigned char*)malloc(512*sizeof(unsigned char));
     int received_plot_length = 0;
 
     int reject_counter = 0;
@@ -518,33 +518,34 @@ int llread(int fd, char *buffer)
             send_supervision_plot(fd, receiver_reject_field);
 
             reject_counter++;
-            break;
+            continue;
         }
-
         // Destuffs the plot
-        byte_destuffing(received_plot, &received_plot_length);        
+        byte_destuffing(&received_plot, &received_plot_length);
 
         int data_length = 0;
         unsigned char* data = retrieve_data(received_plot, received_plot_length, &data_length); // CHANGE! (buffer instead of data and passes to func params )
 
         // Checks if the BCC2 is correct
         unsigned char received_bcc2 = retrieve_bcc2(received_plot, received_plot_length);
+
         unsigned char calculated_bcc2 = calculate_bcc2(data, data_length);
         if(received_bcc2 != calculated_bcc2) {
             printf("\nRejected plot, BCC2 is wrong\n\n");
-            
+
             send_supervision_plot(fd, receiver_reject_field);
 
             reject_counter++;
-            break;
+            continue;
         }
-        
+
         send_supervision_plot(fd, receiver_ready_field);
 
         update_transm_nums();
 
         memcpy(buffer, data, data_length);
         free(data);
+        free(received_plot);
 
         return data_length;
     }
@@ -792,7 +793,7 @@ void update_transm_nums() {
 /* Supervision Plots */
 
 unsigned char* create_supervision_plot(char control_field) {
-    unsigned char *plot = malloc(SUPERVISION_PLOT_SIZE);  
+    unsigned char *plot = malloc(SUPERVISION_PLOT_SIZE);
 
     plot[0] = FLAG;
     plot[1] = A;
@@ -806,9 +807,9 @@ unsigned char* create_supervision_plot(char control_field) {
 int send_supervision_plot(int fd, char control_field) {
     unsigned char* receiver_response = create_supervision_plot(control_field);
     write(fd, receiver_response, 5);
-    free(receiver_response);  
+    free(receiver_response);
 
-    return 0;  
+    return 0;
 }
 
 
@@ -826,12 +827,14 @@ void create_information_plot(char control_field, char *data, int length, unsigne
     plot[3] = plot[1] ^ plot[2];
     memcpy(&plot[4], data, length);
 	plot[4 + length] = BCC2;
-	plot[5 + length] = FLAG;    
+	plot[5 + length] = FLAG;
 }
 
 int receive_information_plot(int fd, unsigned char *received_plot, int *received_plot_length) {
     int state = 0;
     int last_state = 0;
+
+    bool bcc1_wrong = false;
 
     printf("\n");
     while (state != -1)
@@ -876,9 +879,10 @@ int receive_information_plot(int fd, unsigned char *received_plot, int *received
                 state = 4;
             }
             else
-            {   
+            {
                 // BCC1 is wrong
-                return -1;
+                bcc1_wrong = true;
+                state = 4;
             }
             break;
 
@@ -888,23 +892,27 @@ int receive_information_plot(int fd, unsigned char *received_plot, int *received
                 state = -1;
                 break;
             }
-            
+
             state++;
             last_state = state;
 
             break;
         }
-    }    
+    }
 
     *received_plot_length = last_state + 1;
+
+    if(bcc1_wrong)
+      return -1;
+
     return 0;
 }
 
 unsigned char* retrieve_data(unsigned char *information_plot, int plot_length, int *data_length) {
     *data_length = plot_length - 6;
-    
+
     unsigned char *data = (unsigned char*)malloc(*data_length);
-    
+
     data = memcpy(data, &information_plot[4], *data_length);
 
     return data;
