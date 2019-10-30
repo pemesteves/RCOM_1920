@@ -11,7 +11,6 @@
 
 #include "link_layer.h"
 #include "app_layer.h"
-#include "files.h"
 
 #define MODEMDEVICE "/dev/ttyS1"
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
@@ -23,7 +22,9 @@ int main(int argc, char **argv)
 	int serial_fd, c, res;
 
 	//File variables
-	int fd, num_bytes_read;
+	int num_bytes_read;
+	applicationLayerFile fileInfo;
+
 
 	if (argc < 3)
 	{
@@ -31,19 +32,17 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	char *file_name = argv[2];
+	fileInfo.file_name = argv[2];
 
-	if (file_exist(file_name))
+	if (file_exist(fileInfo.file_name))
 	{
-		printf("File %s doesn't exist!!!\n\n", file_name);
+		printf("File %s doesn't exist!!!\n\n", fileInfo.file_name);
 		return -1;
 	}
 	else
 	{
-		printf("File %s exist\n\n", file_name);
+		printf("File %s exist\n\n", fileInfo.file_name);
 	}
-
-	off_t file_size;
 
 	struct termios oldtio;
 	if ((serial_fd = llopen(argv[1], TRANSMITTER, &oldtio)) < 0)
@@ -52,18 +51,18 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	if ((fd = open_file(file_name)) < 0)
+	if (open_file(&fileInfo) < 0)
 	{
-		printf("Can't open %s!\n\n", file_name);
+		printf("Can't open %s!\n\n", fileInfo.file_name);
 		return -1;
 	}
-	printf("Opened file %s\n\n", file_name);
+	printf("Opened file %s\n\n", fileInfo.file_name);
 
-	int control_packet_length = 5 * sizeof(unsigned char) + strlen(file_name);
+	int control_packet_length = 5 * sizeof(unsigned char) + strlen(fileInfo.file_name);
 	int first_control_packet_length = control_packet_length;
 
 	unsigned char *ctrl_packet = (unsigned char *)malloc(control_packet_length);
-	if (control_packet(file_name, START, ctrl_packet, &control_packet_length, &file_size) < 0)
+	if (control_packet(&fileInfo, START, ctrl_packet, &control_packet_length) < 0)
 	{
 		printf("Error in start control_packet\n\n");
 		return -1;
@@ -96,7 +95,7 @@ int main(int argc, char **argv)
 	for (;;)
 	{
 		memset(data, '\0', data_length);
-		num_bytes_read = read_file(fd, data, data_length);
+		num_bytes_read = read_file(fileInfo.fd, data, data_length);
 
 		if (num_bytes_read < 0)
 		{
@@ -108,7 +107,7 @@ int main(int argc, char **argv)
 			printf("End of file\n\n");
 			break;
 		}
-		printf("Read %i bytes from file %s\n\n", num_bytes_read, file_name);
+		printf("Read %i bytes from file %s\n\n", num_bytes_read, fileInfo.file_name);
 
 		data_packet_length = 4 + num_bytes_read;
 		data_pkt = (unsigned char *)malloc(data_packet_length);
@@ -133,7 +132,7 @@ int main(int argc, char **argv)
 	}
 	free(data);
 
-	if (control_packet(file_name, END, ctrl_packet, &control_packet_length, &file_size) < 0)
+	if (control_packet(&fileInfo, END, ctrl_packet, &control_packet_length) < 0)
 	{
 		printf("Error in end control_packet\n\n");
 		return -1;
@@ -157,9 +156,9 @@ int main(int argc, char **argv)
 	}
 	free(ctrl_packet);
 
-	if (close_file(fd) < 0)
+	if (close_file(fileInfo.fd) < 0)
 	{
-		printf("Can't close %s!\n\n", file_name);
+		printf("Can't close %s!\n\n", fileInfo.file_name);
 		return -1;
 	}
 

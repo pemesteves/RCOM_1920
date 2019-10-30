@@ -11,21 +11,23 @@ int file_exist(char* file_name){
     return stat (file_name, &st);
 }
 
-off_t get_file_size(char* file_name){
+int get_file_size(applicationLayerFile *file){
     struct stat st;
-    if(stat(file_name, &st) < 0)
+    if(stat(file->file_name, &st) < 0)
         return -1;
-    return st.st_size;
+    
+    file->file_size = st.st_size;
+    return 0;
 }
 
-int open_file(char* file_name){
-    int fd = open(file_name, O_RDONLY);
+int open_file(applicationLayerFile *file){//char* file_name){
+    int fd = open(file->file_name, O_RDONLY);
     if(fd < 0){
         perror("open");
         return -1;
     }
-    
-    return fd;
+    file->fd = fd;
+    return 0;
 }
 
 

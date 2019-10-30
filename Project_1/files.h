@@ -1,13 +1,20 @@
 #include <sys/types.h>
 
+
+typedef struct {
+    char* file_name;
+    off_t file_size;
+    int fd;
+} applicationLayerFile;
+
 int file_exist(char* file_name);
 
-off_t get_file_size(char* file_name);
+int get_file_size(applicationLayerFile *file);
 
 /**
  * 
  */
-int open_file(char* file_name);
+int open_file(applicationLayerFile *file);//char* file_name);
 
 /**
  * 

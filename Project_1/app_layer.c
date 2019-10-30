@@ -1,6 +1,4 @@
 #include "app_layer.h"
-#include "files.h"
-
 
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -26,15 +24,18 @@ int data_packet(int data_length, char * data, unsigned char * packet) {
     return 0;
 }
 
-int control_packet(char * file_name, char control, char * packet, int *packet_size, off_t *file_size){
+int control_packet(applicationLayerFile *file, char control, char * packet, int *packet_size){
     packet[0] = control; //Control octet: 2 - start packet; 3 - end packet
     if(control == START){
-        int file_name_size = strlen(file_name);
+        int file_name_size = strlen(file->file_name);
         packet[1] = 0; // T1 - file size
     
-        *file_size =  get_file_size(file_name);
+        if(get_file_size(file)){
+            printf("Error while getting the file size\n\n");
+            return -1;
+        }
 
-        off_t v1_file_size = *file_size; 
+        off_t v1_file_size = file->file_size; 
         
         int v1_length = 0;
         char* v1 = NULL;
@@ -64,7 +65,7 @@ int control_packet(char * file_name, char control, char * packet, int *packet_si
 
         packet[t2_position] = 1; //T2 - file name
         packet[t2_position+1] = (unsigned char)file_name_size;
-        if(memcpy(&packet[t2_position+2], file_name, file_name_size) == NULL){
+        if(memcpy(&packet[t2_position+2], file->file_name, file_name_size) == NULL){
             printf("Error in memcpy\n");
             return -1;
         }
