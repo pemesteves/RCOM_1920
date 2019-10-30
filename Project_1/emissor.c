@@ -90,7 +90,7 @@ int main(int argc, char** argv)
 			printf("End of file\n\n");
 			break;
 		}
-		printf("Read %i bytes from file %s\n\n", num_bytes_read, "./pinguim.gif");
+		printf("Read %i bytes from file %s\n\n", num_bytes_read, file_name);
 
 		data_packet_length = 4 + num_bytes_read;
    		data_pkt = (unsigned char*)malloc(data_packet_length);
@@ -133,11 +133,11 @@ int main(int argc, char** argv)
 	free(ctrl_packet);
 
 	if(close_file(fd) < 0){
-		printf("Can't close %s!\n\n", "./pinguim.gif");
+		printf("Can't close %s!\n\n", file_name);
 		return -1;
 	}
 
-	if(llclose(serial_fd,& oldtio, TRANSMITTER)){
+	if(llclose(serial_fd, &oldtio, TRANSMITTER)){
 		printf("llclose error\n");
 		return -1;
 	}

@@ -77,18 +77,16 @@ void byte_stuffing(unsigned char** string, int *length){
          }
         else
         {
-            new_string[j] = string[i];
+            new_string[j] = (*string)[i];
         }
     }
-    new_string[new_length-1] = string[*length-1];
+    new_string[new_length-1] = (*string)[*length-1];
 
 
     *string = realloc(*string, new_length);
     memcpy(*string, new_string, new_length);
     *length = new_length;
-
-    printf("\n\n");
-
+    
     free(new_string);
 }
 
