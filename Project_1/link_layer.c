@@ -128,79 +128,45 @@ void byte_destuffing(unsigned char** string, int *length){
 
 /****************************/
 /**                        **/
-/**  Auxiliary Functions   **/
+/**     Main Functions     **/
 /**                        **/
 /****************************/
 
 int llopen(char *gate, int flag, struct termios *oldtio)
 {
-    if (flag != TRANSMITTER && flag != RECEIVER)
+    if(check_role(flag)) {
+        printf("ERROR: Role must be TRANSMITTER or RECEIVER\n");
         return -1;
+    }
+
+    if(check_serial_port(gate)) {
+        printf("ERROR: Wrong serial port\n");
+        return -1;
+    }
+
+    if(open_serial_port(gate)) {
+        printf("ERROR: Unable to open serial port\n");
+        return -1;
+    }
+
+    int fd;
+    if(save_current_termios(fd, oldtio)){
+        printf("ERROR: Unable to save current termios settings\n");
+        return -1;
+    }
+
+    struct termios newtio;
+    if(set_new_termios(fd, &newtio, flag)) {
+        printf("ERROR: Unable to create new termios and set it\n");
+        return -1;
+    }
 
     void* sigalrm_handler;
-
     if(flag == TRANSMITTER){
         sigalrm_handler = signal(SIGALRM, atende);  // instala  rotina que atende interrupcao
     }
 
-    int fd;
-    struct termios newtio;
     char buf[255];
-
-    if ((strcmp("/dev/ttyS0", gate) != 0) && (strcmp("/dev/ttyS1", gate) != 0) && (strcmp("/dev/ttyS2", gate) != 0) //S2 para teste em VB
-         && (strcmp("/dev/ttyS4", gate) != 0))
-        {
-            printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
-            return -1;
-        }
-
-    /*
-    Open serial port device for reading and writing and not as controlling tty
-    because we don't want to get killed if linenoise sends CTRL-C.
-    */
-    fd = open(gate, O_RDWR | O_NOCTTY);
-
-    if (fd < 0)
-    {
-        perror(gate);
-        return -1;
-    }
-
-    if (tcgetattr(fd, oldtio) == -1)
-    { /* save current port settings */
-        perror("tcgetattr");
-        return -1;
-    }
-
-    bzero(&newtio, sizeof(newtio));
-    newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
-    newtio.c_iflag = IGNPAR;
-    newtio.c_oflag = 0;
-
-    /* set input mode (non-canonical, no echo,...) */
-    newtio.c_lflag = 0;
-
-    if (flag == TRANSMITTER)
-    {
-        newtio.c_cc[VTIME] = 3; /* inter-character timer unused */
-        newtio.c_cc[VMIN] = 0;  /* blocking read until 0 chars received */
-    }
-    else
-    {
-        newtio.c_cc[VTIME] = 0; /* inter-character timer unused */
-        newtio.c_cc[VMIN] = 1;  /* blocking read until 1 char received */
-    }
-
-    tcflush(fd, TCIOFLUSH);
-
-    if (tcsetattr(fd, TCSANOW, &newtio) == -1)
-    {
-        perror("tcsetattr");
-        return -1;
-    }
-
-    printf("New termios structure set at llopen\n");
-
     int state = 0;
     if (flag == TRANSMITTER)
     {
@@ -931,11 +897,69 @@ unsigned char calculate_bcc2(unsigned char *data, int data_length) {
 }
 
 
-/* Utiliritaty Functions */
+/* Serial port setup */
 
-void print_string(unsigned char *string, int length) {
-    for(int i = 0; i < length; i++) {
-        printf("%c ", string[i]);
+int open_serial_port(const char* port) {
+	return open(port, O_RDWR | O_NOCTTY);
+}
+
+int close_serial_port(int fd, struct termios *oldtio) {
+	if (tcsetattr(fd, TCSANOW, oldtio) == -1) {
+		perror("tcsetattr");
+		return 1;
+	}
+
+	close(fd);
+	return 0;
+}
+
+int set_new_termios(int fd, struct termios *newtio, int flag) {
+	bzero(newtio, sizeof(*newtio));
+	newtio->c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+	newtio->c_iflag = IGNPAR;
+	newtio->c_oflag = 0;
+	newtio->c_lflag = 0;
+
+    switch(flag) {
+        case TRANSMITTER:
+            newtio->c_cc[VTIME] = 3; /* inter-character timer unused */
+            newtio->c_cc[VMIN] = 0;  /* blocking read until 0 chars received */
+            break;
+        case RECEIVER:
+            newtio->c_cc[VTIME] = 0; /* inter-character timer unused */
+            newtio->c_cc[VMIN] = 1;  /* blocking read until 1 char received */
+            break;
     }
-    printf("\n");
+
+	if (tcflush(fd, TCIOFLUSH) != 0)
+		return 1;
+
+	if (tcsetattr(fd, TCSANOW, newtio) != 0)
+		return 1;
+
+	printf("New termios structure set.\n");
+
+	return 1;
+}
+
+int save_current_termios(int fd, struct termios *oldtio) {
+	if (tcgetattr(fd, oldtio) != 0) {
+		return 1;
+	}
+
+	return 0;
+}
+
+int check_role(int flag) {
+    if (flag != TRANSMITTER && flag != RECEIVER)
+        return -1;
+
+    return 0;
+}
+
+int check_serial_port(char *port) {
+    if ((strcmp("/dev/ttyS0", gate) != 0) && (strcmp("/dev/ttyS1", gate) != 0) && (strcmp("/dev/ttyS2", gate) != 0) && (strcmp("/dev/ttyS4", gate) != 0)) {
+            return -1;
+
+    return 0;
 }
