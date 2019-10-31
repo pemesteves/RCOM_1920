@@ -897,7 +897,7 @@ unsigned char calculate_bcc2(unsigned char *data, int data_length) {
 /**                        **/
 /****************************/
 
-int open_serial_port(const char* port) {
+int open_serial_port(char* port) {
 	int fd;
     if((fd = open(port, O_RDWR | O_NOCTTY)) < 0){
         perror("open");
