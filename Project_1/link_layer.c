@@ -136,7 +136,11 @@ int llopen(char *gate, int flag, struct termios *oldtio)
                 break;
 
             send_supervision_plot(fd, C_UA);
+
+            connected = 1;
         }
+
+        break;
     }
 
     free(received_plot);
