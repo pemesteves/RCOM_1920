@@ -16,6 +16,7 @@ int llclose(int fd, struct termios *oldtio, int flag);
 int open_serial_port(char* port);
 int close_serial_port(int fd, struct termios *oldtio);
 int save_current_termios(int fd, struct termios *oldtio);
+int set_termios(int fd, struct termios *newtio);
 int set_new_termios(int fd, struct termios *newtio, int flag);
 int check_role(int flag);
 int check_serial_port(char *port);

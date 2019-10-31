@@ -118,10 +118,10 @@ int llopen(char *gate, int flag, struct termios *oldtio)
             send_supervision_plot(fd, C_SET);
 
             if(receive_supervision_plot(fd, received_plot, flag))
-                break;
+                continue;
 
             if(check_control_field(received_plot, C_UA))
-                break;
+                continue;
 
             connected = true;
         }
@@ -130,14 +130,13 @@ int llopen(char *gate, int flag, struct termios *oldtio)
     case RECEIVER:
 
         while(!connected) {
-            printf("ola\n");
             receive_supervision_plot(fd, received_plot, flag);
-            printf("ola1\n");
+            
             if(check_control_field(received_plot, C_SET))
                 break;
-            printf("ola2\n");
+            
             send_supervision_plot(fd, C_UA);
-            printf("ola3\n");
+            
             connected = true;
         }
 
@@ -150,7 +149,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
         alarm(0);
         (void) signal(SIGALRM, sigalrm_handler);
     }
-printf("ola5\n");
+    
     return fd;
 }
 
@@ -354,202 +353,61 @@ int llread(int fd, char *buffer)
 
 int llclose(int fd, struct termios *oldtio, int flag)
 {
-    int state = 0;
-    if (flag == TRANSMITTER)
-    {
-        unsigned char SET[5]; //[FLAG, A, C_DISC, BCC, FLAG]
-
-        while (state < 5)
+    unsigned char *received_plot = (unsigned char*)malloc(255*sizeof(unsigned char));
+    bool received = false;
+    switch(flag) {
+        case TRANSMITTER:
         {
-            SET[0] = FLAG;
-            SET[1] = A;
-            SET[2] = C_DISC;
-            SET[3] = SET[1] ^ SET[2]; //BCC
-            SET[4] = FLAG;
+            while(!received) {
+                send_supervision_plot(fd, C_DISC);
 
-            int size_written;
-            //Send DISC
-            if ((size_written = write(fd, SET, 5)) < 0)
-            {
-                perror("write");
-                return -1;
+                if(receive_supervision_plot(fd, received_plot, flag))
+                    continue;
+                if(check_control_field(received_plot, C_DISC))
+                    continue;
+
+                send_supervision_plot(fd, C_UA);
+
+                received = true;
             }
 
-            printf("%d bytes written: ", size_written);
-            printf("%x %x %x %x %x\n", SET[0], SET[1], SET[2], SET[3], SET[4]);
-
-            memset(SET, '\0', sizeof(SET));
-
-            state = 0;
-            //Receive DISC
-            while (state != 5) /* loop for input */
-            {
-
-                read(fd, &SET[state], 1); /* returns after 5 chars have been input */
-                switch (state)
-                {
-                case 0:
-                    if (SET[state] == FLAG)
-                        state = 1;
-                    break;
-                case 1:
-                    if (SET[state] == A)
-                        state = 2;
-                    else if (SET[state] == FLAG)
-                        state = 1;
-                    else
-                        state = 0;
-                    break;
-                case 2:
-                    if (SET[state] == C_DISC)
-                        state = 3;
-                    else if (SET[state] == FLAG)
-                        state = 1;
-                    else
-                        state = 0;
-                    break;
-                case 3:
-                    if (SET[state] == C_DISC ^ A)
-                        state = 4;
-                    else
-                        state = 0;
-                    break;
-                case 4:
-                    if (SET[state] == FLAG)
-                        state = 5;
-                    else
-                        state = 0;
-                    break;
-                default:
-                    break;
-                }
-            }
+            break;
         }
-
-        //Send UA
-        SET[0] = FLAG;
-        SET[1] = A;
-        SET[2] = C_UA;
-        SET[3] = SET[1] ^ SET[2]; //BCC
-        SET[4] = FLAG;
-
-        int size_written;
-        if ((size_written = write(fd, SET, 5)) < 0)
+        
+        case RECEIVER:
         {
-            perror("write");
-            return -1;
-        }
-    }
-    else
-    {
-        char buf[255];
-        //Receive DISC
-        while (state != 5)
-        {                             /* loop for input */
-            read(fd, &buf[state], 1); /* returns after 5 chars have been input */
-            switch (state)
-            {
-            case 0:
-                if (buf[state] == FLAG)
-                    state = 1;
-                break;
-            case 1:
-                if (buf[state] == A)
-                    state = 2;
-                else if (buf[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-            case 2:
-                if (buf[state] == C_DISC)
-                    state = 3;
-                else if (buf[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-            case 3:
-                if (buf[state] == C_DISC ^ A)
-                    state = 4;
-                else
-                    state = 0;
-                break;
-            case 4:
-                if (buf[state] == FLAG)
-                    state = 5;
-                else
-                    state = 0;
-                break;
-            default:
-                break;
+            while(!received) {
+                if(receive_supervision_plot(fd, received_plot, flag))
+                    continue;
+
+                if(check_control_field(received_plot, C_DISC))
+                    continue;
+
+                send_supervision_plot(fd, C_DISC);
+
+                if(receive_supervision_plot(fd, received_plot, flag))
+                    continue;
+
+                if(check_control_field(received_plot, C_UA))
+                    continue;
+
+                received = true;
             }
+
+            break;
         }
 
-        unsigned char DISC[5];
-
-        DISC[0] = FLAG;
-        DISC[1] = A;
-        DISC[2] = C_DISC;
-        DISC[3] = DISC[1] ^ DISC[2]; //BCC1
-        DISC[4] = FLAG;
-
-        //Send DISC
-        int size_written = write(fd, DISC, 5);
-        printf("%d bytes written: ", size_written);
-        printf("%x %x %x %x %x\n", DISC[0], DISC[1], DISC[2], DISC[3], DISC[4]);
-
-        state = 0;
-        //Receive UA
-        while (state != 5)
-        {                             /* loop for input */
-            read(fd, &buf[state], 1); /* returns after 5 chars have been input */
-            switch (state)
-            {
-            case 0:
-                if (buf[state] == FLAG)
-                    state = 1;
-                break;
-            case 1:
-                if (buf[state] == A)
-                    state = 2;
-                else if (buf[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-            case 2:
-                if (buf[state] == C_UA)
-                    state = 3;
-                else if (buf[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-            case 3:
-                if (buf[state] == C_UA ^ A)
-                    state = 4;
-                else
-                    state = 0;
-                break;
-            case 4:
-                if (buf[state] == FLAG)
-                    state = 5;
-                else
-                    state = 0;
-                break;
-            default:
-                break;
-            }
-        }
+        default:
+            break;
     }
+    
+    free(received_plot);
 
     if(flag == TRANSMITTER)
         sleep(2);
 
-    if (tcsetattr(fd, TCSANOW, oldtio) == -1)
-    {
-        perror("tcsetattr");
+    if(set_termios(fd, oldtio)) {
+        printf("ERROR: unable to set old termios\n");
         return -1;
     }
 
@@ -919,6 +777,13 @@ int close_serial_port(int fd, struct termios *oldtio) {
 
 	close(fd);
 	return 0;
+}
+
+int set_termios(int fd, struct termios *newtio) {
+    if (tcsetattr(fd, TCSANOW, newtio) != 0)
+		return 1;
+
+    return 0;
 }
 
 int set_new_termios(int fd, struct termios *newtio, int flag) {
