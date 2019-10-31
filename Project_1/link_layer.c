@@ -75,12 +75,13 @@ int llopen(char *gate, int flag, struct termios *oldtio)
         return -1;
     }
 
-    if(open_serial_port(gate)) {
+    int fd;
+
+    if((fd = open_serial_port(gate)) < 0) {
         printf("ERROR: Unable to open serial port\n");
         return -1;
     }
 
-    int fd;
     if(save_current_termios(fd, oldtio)){
         printf("ERROR: Unable to save current termios settings\n");
         return -1;
@@ -999,7 +1000,12 @@ unsigned char calculate_bcc2(unsigned char *data, int data_length) {
 /****************************/
 
 int open_serial_port(const char* port) {
-	return open(port, O_RDWR | O_NOCTTY);
+	int fd;
+    if((fd = open(port, O_RDWR | O_NOCTTY)) < 0){
+        perror("open");
+        return -1;
+    }
+    return fd;
 }
 
 int close_serial_port(int fd, struct termios *oldtio) {
@@ -1028,8 +1034,11 @@ int set_new_termios(int fd, struct termios *newtio, int flag) {
             newtio->c_cc[VTIME] = 0; /* inter-character timer unused */
             newtio->c_cc[VMIN] = 1;  /* blocking read until 1 char received */
             break;
+        default:
+            printf("ERROR: flag doesn't exist!!!\n\n");
+            return -1;
     }
-
+    
 	if (tcflush(fd, TCIOFLUSH) != 0)
 		return 1;
 
@@ -1038,7 +1047,7 @@ int set_new_termios(int fd, struct termios *newtio, int flag) {
 
 	printf("New termios structure set.\n");
 
-	return 1;
+	return 0;
 }
 
 int save_current_termios(int fd, struct termios *oldtio) {
@@ -1057,7 +1066,7 @@ int check_role(int flag) {
 }
 
 int check_serial_port(char *port) {
-    if ((strcmp("/dev/ttyS0", port) != 0) && (strcmp("/dev/ttyS1", port) != 0) && (strcmp("/dev/ttyS2", port) != 0) && (strcmp("/dev/ttyS4", port) != 0)) {
+    if ((strcmp("/dev/ttyS0", port) != 0) && (strcmp("/dev/ttyS1", port) != 0) && (strcmp("/dev/ttyS2", port) != 0) && (strcmp("/dev/ttyS4", port) != 0)) 
             return -1;
 
     return 0;

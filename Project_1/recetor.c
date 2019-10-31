@@ -114,11 +114,22 @@ int main(int argc, char** argv)
         }
         if(new_file_size != file_size){
           printf("NEW FILE SIZE: %ld\n", new_file_size);
-          printf("OLD FILE SIZEL: %ld\n", file_size);
+          printf("OLD FILE SIZE: %ld\n", file_size);
           printf("Received wrong file size\n\n");
           return -1;
         }
-        if(get_file_size(file_name) != file_size){
+        
+        applicationLayerFile file;
+        file.file_name = file_name;
+        
+        if(get_file_size(&file) < 0){
+          printf("Error in the get_file_size function\n\n");
+          return -1;
+        }
+        
+        if(file.file_size != file_size){
+          printf("EXPECTED FILE SIZE: %ld\n", new_file_size);
+          printf("REAL FILE SIZE: %ld\n", file.file_size);
           printf("File size is different than expected\n\n");
           return -1;
         }
