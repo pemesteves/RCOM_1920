@@ -137,7 +137,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
 
             send_supervision_plot(fd, C_UA);
 
-            connected = 1;
+            connected = true;
         }
 
         break;
