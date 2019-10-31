@@ -80,18 +80,18 @@ int llopen(char *gate, int flag, struct termios *oldtio)
         printf("ERROR: Unable to open serial port\n");
         return -1;
     }
-
+    
     if(save_current_termios(fd, oldtio)){
         printf("ERROR: Unable to save current termios settings\n");
         return -1;
     }
-
+    
     struct termios newtio;
     if(set_new_termios(fd, &newtio, flag)) {
         printf("ERROR: Unable to create new termios and set it\n");
         return -1;
     }
-
+    
     void* sigalrm_handler;
     if(flag == TRANSMITTER){
         sigalrm_handler = signal(SIGALRM, atende);  // instala  rotina que atende interrupcao
@@ -128,15 +128,16 @@ int llopen(char *gate, int flag, struct termios *oldtio)
         break;
 
     case RECEIVER:
-        while(!connected) {
-            
-            receive_supervision_plot(fd, received_plot, flag);
 
+        while(!connected) {
+            printf("ola\n");
+            receive_supervision_plot(fd, received_plot, flag);
+            printf("ola1\n");
             if(check_control_field(received_plot, C_SET))
                 break;
-
+            printf("ola2\n");
             send_supervision_plot(fd, C_UA);
-
+            printf("ola3\n");
             connected = true;
         }
 
@@ -149,7 +150,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
         alarm(0);
         (void) signal(SIGALRM, sigalrm_handler);
     }
-
+printf("ola5\n");
     return fd;
 }
 
@@ -710,7 +711,7 @@ int receive_supervision_plot(int fd, unsigned char *received_plot, int flag) {
             break;
 
         case RECEIVED_A:
-            if (valid_control_field(received_plot[state]) == C_UA)
+            if (valid_control_field(received_plot[state]))
                 state = RECEIVED_CTRL;
             else if (received_plot[state] == FLAG)
                 state = RECEIVED_FLAG;
@@ -849,7 +850,7 @@ int receive_information_plot(int fd, unsigned char *received_plot, int *received
 /****************************/
 
 bool check_control_field(unsigned char *plot, unsigned char control_field) {
-    return plot[2] == control_field;
+    return plot[2] != control_field;
 }
 
 bool valid_control_field(unsigned char control_field) {

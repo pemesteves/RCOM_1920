@@ -18,7 +18,7 @@ int data_packet(int data_length, char * data, unsigned char * packet) {
     packet[2] = data_length/256;
     packet[3] = data_length%256;
 
-    if(memcpy(&packet[4], data, data_length) == -1)
+    if(memcpy(&packet[4], data, data_length) == NULL)
         return -1;
 
     return 0;

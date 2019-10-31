@@ -43,7 +43,7 @@ int main(int argc, char** argv)
     unsigned char data[256];
     int data_size = 0;
 
-    if((data_size = llread(fd, &data)) < 0){
+    if((data_size = llread(fd, data)) < 0){
       printf("\nError in llread\n");
       return -1;
     }
