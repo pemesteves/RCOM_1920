@@ -33,9 +33,8 @@ int main(int argc, char** argv)
     return -1;
   }
 
-  char *file_name, *content;
-  int received_fd;
-  off_t file_size;
+  char *content;
+  applicationLayerFile file;
 
   bool received_end_packet = false;
   bool received_start_packet = false;
@@ -69,7 +68,7 @@ int main(int argc, char** argv)
           printf("Can't parse the data packet\n\n");
           return -1;
         }
-        if(write_file(received_fd, content, content_size) < 0){
+        if(write_file(file.fd, content, content_size) < 0){
           printf("Can't write in the new file\n\n");
           return -1;
         }
@@ -79,14 +78,14 @@ int main(int argc, char** argv)
 
       case START: // Start control packet
       {
-        if(parse_control_packet(data, data_size, &file_name, &file_size) < 0){
+        if(parse_control_packet(data, data_size, &file) < 0){
           printf("Can't parse the starting control packet\n\n");
           return -1;
         }
-        printf("File size: %ld \n\n", file_size);
-        printf("FILENAME: %s\n", file_name);
+        printf("File size: %ld \n\n", file.file_size);
+        printf("FILENAME: %s\n", file.file_name);
 
-        if((received_fd = create_file(file_name)) < 0){
+        if(create_file(&file) < 0){
           printf("Can't open the new file\n\n");
           return -1;
         }
@@ -101,43 +100,40 @@ int main(int argc, char** argv)
           return -1;
         }
 
-        char* new_file_name;
-        off_t new_file_size;
-        if(parse_control_packet(data, data_size, &new_file_name, &new_file_size) < 0){
+        applicationLayerFile new_file_data;
+
+        if(parse_control_packet(data, data_size, &new_file_data) < 0){
           printf("Can't parse the starting control packet\n\n");
           return -1;
         }
 
-        if(strcmp(new_file_name, file_name) != 0){
+        if(strcmp(new_file_data.file_name, file.file_name) != 0){
           printf("Received wrong file name\n\n");
           return -1;
         }
-        if(new_file_size != file_size){
-          printf("NEW FILE SIZE: %ld\n", new_file_size);
-          printf("OLD FILE SIZE: %ld\n", file_size);
+        if(new_file_data.file_size != file.file_size){
+          printf("NEW FILE SIZE: %ld\n", new_file_data.file_size);
+          printf("OLD FILE SIZE: %ld\n", file.file_size);
           printf("Received wrong file size\n\n");
           return -1;
         }
-        
-        applicationLayerFile file;
-        file.file_name = file_name;
         
         if(get_file_size(&file) < 0){
           printf("Error in the get_file_size function\n\n");
           return -1;
         }
         
-        if(file.file_size != file_size){
-          printf("EXPECTED FILE SIZE: %ld\n", new_file_size);
+        if(file.file_size != new_file_data.file_size){
+          printf("EXPECTED FILE SIZE: %ld\n", new_file_data.file_size);
           printf("REAL FILE SIZE: %ld\n", file.file_size);
           printf("File size is different than expected\n\n");
           return -1;
         }
-        if(close_file(received_fd) < 0){
+        if(close_file(file.fd) < 0){
           printf("Can't close file\n\n");
           return -1;
         }
-        free(new_file_name);
+        free(new_file_data.file_name);
         received_end_packet = true;
         break;
       }
@@ -149,7 +145,7 @@ int main(int argc, char** argv)
     printf("\n");
   }
 
-  free(file_name);
+  free(file.file_name);
 
   if(llclose(fd, &oldtio, RECEIVER)){
 		printf("\nllclose error\n");

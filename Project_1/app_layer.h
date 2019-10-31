@@ -15,4 +15,4 @@ int control_packet(applicationLayerFile *file, char control, char * packet, int 
 
 int parse_data_packet(unsigned char *packet, unsigned char **content, unsigned int *content_size);
 
-int parse_control_packet(unsigned char *packet, unsigned int packet_size, char **file_name, off_t *file_size); 
+int parse_control_packet(unsigned char *packet, unsigned int packet_size, applicationLayerFile *file); //char **file_name, off_t *file_size); 

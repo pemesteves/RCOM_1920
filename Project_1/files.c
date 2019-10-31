@@ -50,14 +50,13 @@ int close_file(int fd){
     return 0;
 }
 
-int create_file(char* file_name){
-    int fd;
-    if((fd = open(file_name, O_WRONLY | O_APPEND | O_CREAT | O_TRUNC, 0750)) < 0){
+int create_file(applicationLayerFile *file){
+    if((file->fd = open(file->file_name, O_WRONLY | O_APPEND | O_CREAT | O_TRUNC, 0750)) < 0){
         perror("open file\n");
         return -1;
     }
 
-    return fd;
+    return 0;
 }
 
 int write_file(int fd, unsigned char* content, unsigned int content_size){

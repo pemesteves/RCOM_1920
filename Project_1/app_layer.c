@@ -96,16 +96,16 @@ int parse_data_packet(unsigned char *packet, unsigned char **content, unsigned i
     return 0;
 }
 
-int parse_control_packet(unsigned char *packet, unsigned int packet_size, char **file_name, off_t *file_size) {
+int parse_control_packet(unsigned char *packet, unsigned int packet_size, applicationLayerFile *file){//char **file_name, off_t *file_size) {
 
     for (int i = 1; i < packet_size ; i++){
         if (packet[i] == SIZE) {
             i++;
 
             unsigned int length = (unsigned int) packet[i];
-            *file_size = 0;
+            file->file_size = 0;
             for (int j = 1; j <= length ; j++)
-                *file_size = ((*file_size)<<8) + (off_t)packet[i+j];
+                file->file_size = ((file->file_size)<<8) + (off_t)packet[i+j];
 
             i += length;
         }
@@ -114,18 +114,18 @@ int parse_control_packet(unsigned char *packet, unsigned int packet_size, char *
 
             unsigned int length = (unsigned int) packet[i];
 
-            *file_name = (char*)malloc(length + 1);
+            file->file_name = (char*)malloc(length + 1);
 
-            if(*file_name == NULL){
+            if(file->file_name == NULL){
                 printf("malloc error\n\n");
                 return -1;
             }
 
             for (int j = 1; j <= length ; j++) {
-                (*file_name)[j-1] = packet[i+j];
+                (file->file_name)[j-1] = packet[i+j];
             }
 
-            (*file_name)[length] = '\0';
+            (file->file_name)[length] = '\0';
 
             i += length;
         }

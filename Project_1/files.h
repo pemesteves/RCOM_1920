@@ -26,6 +26,6 @@ int read_file(int fd, unsigned char* string, int length);
  */
 int close_file(int fd);
 
-int create_file(char* file_name);
+int create_file(applicationLayerFile *file);//char* file_name);
 
 int write_file(int fd, unsigned char* content, unsigned int content_size);
