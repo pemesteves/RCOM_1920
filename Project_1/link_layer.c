@@ -76,7 +76,6 @@ int llopen(char *gate, int flag, struct termios *oldtio)
     }
 
     int fd;
-
     if((fd = open_serial_port(gate)) < 0) {
         printf("ERROR: Unable to open serial port\n");
         return -1;
@@ -98,153 +97,52 @@ int llopen(char *gate, int flag, struct termios *oldtio)
         sigalrm_handler = signal(SIGALRM, atende);  // instala  rotina que atende interrupcao
     }
 
-    char buf[255];
-    int state = 0;
-    if (flag == TRANSMITTER)
-    {
-        unsigned char SET[5]; //[FLAG, A, C_SET, BCC, FLAG]
+    bool connected = false;
+    unsigned char *received_plot = (unsigned char *)malloc(255 * sizeof(unsigned char));
+    
+    switch(flag) {
+    case TRANSMITTER:
+        while(!connected) {
 
-        while (counter < 4 && state < 5)
-        {
+            if(counter > 4) {
+                write(stderr, "Can't open protocol\n", 21);
+                return -1;
+            }
+            
             printf("Transmission number %d\n", counter);
-            if (alarm_flag)
-            {
+            if(alarm_flag) {
                 alarm(newtio.c_cc[VTIME]);
                 alarm_flag = 0;
             }
 
-            SET[0] = FLAG;
-            SET[1] = A;
-            SET[2] = C_SET;
-            SET[3] = SET[1] ^ SET[2]; //BCC
-            SET[4] = FLAG;
+            send_supervision_plot(fd, C_SET);
 
-            int size_written;
+            if(receive_supervision_plot(fd, received_plot, flag))
+                break;
 
-            if ((size_written = write(fd, SET, 5)) < 0)
-            {
-                perror("write");
-                return -1;
-            }
+            if(check_control_field(received_plot, C_UA))
+                break;
 
-            printf("%d bytes written: ", size_written);
-            printf("%x %x %x %x %x\n", SET[0], SET[1], SET[2], SET[3], SET[4]);
-
-            memset(SET, '\0', sizeof(SET));
-
-            state = 0;
-            while (state != 5) /* loop for input */
-            {
-                if (alarm_flag == 1)
-                {
-                    printf("Receiving error at retransmission number %d\n", counter - 1);
-                    break;
-                }
-                read(fd, &SET[state], 1); /* returns after 5 chars have been input */
-                switch (state)
-                {
-                case 0:
-                    if (SET[state] == FLAG)
-                        state = 1;
-                    break;
-                case 1:
-                    if (SET[state] == A)
-                        state = 2;
-                    else if (SET[state] == FLAG)
-                        state = 1;
-                    else
-                        state = 0;
-                    break;
-                case 2:
-                    if (SET[state] == C_UA)
-                        state = 3;
-                    else if (SET[state] == FLAG)
-                        state = 1;
-                    else
-                        state = 0;
-                    break;
-                case 3:
-                    if (SET[state] == C_UA ^ A)
-                        state = 4;
-                    else
-                        state = 0;
-                    break;
-                case 4:
-                    if (SET[state] == FLAG)
-                        state = 5;
-                    else
-                        state = 0;
-                    break;
-                default:
-                    break;
-                }
-            }
+            connected = true;
         }
-        if(counter >= 4){
-            write(stderr, "Can't open protocol\n", 21);
-            return -1;
+        break;
+
+    case RECEIVER:
+        while(!connected) {
+            
+            receive_supervision_plot(fd, received_plot, flag);
+
+            if(check_control_field(received_plot, C_SET))
+                break;
+
+            send_supervision_plot(fd, C_UA);
         }
     }
-    else
-    {
-        while (state != 5)
-        {                             /* loop for input */
-            read(fd, &buf[state], 1); /* returns after 5 chars have been input */
-            switch (state)
-            {
-            case 0:
-                if (buf[state] == FLAG)
-                    state = 1;
-                break;
-            case 1:
-                if (buf[state] == A)
-                    state = 2;
-                else if (buf[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-            case 2:
-                if (buf[state] == C_SET)
-                    state = 3;
-                else if (buf[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-            case 3:
-                if (buf[state] == C_SET ^ A)
-                    state = 4;
-                else
-                    state = 0;
-                break;
-            case 4:
-                if (buf[state] == FLAG)
-                    state = 5;
-                else
-                    state = 0;
-                break;
-            default:
-                break;
-            }
-        }
 
-        unsigned char UA[5];
-
-        UA[0] = FLAG;
-        UA[1] = A;
-        UA[2] = C_UA;
-        UA[3] = UA[1] ^ UA[2]; //BCC
-        UA[4] = FLAG;
-
-
-  		int size_written = write(fd, UA, 5);
-  		printf("%d bytes written: ", size_written);
-        printf("%x %x %x %x %x\n", UA[0], UA[1], UA[2], UA[3], UA[4]);
-    }
+    free(received_plot);
 
     if(flag == TRANSMITTER){
-          alarm(0);
+        alarm(0);
         (void) signal(SIGALRM, sigalrm_handler);
     }
 
@@ -779,16 +677,16 @@ int send_supervision_plot(int fd, char control_field) {
     return 0;
 }
 
-int receive_supervision_plot(int fd, unsigned char *received_plot) {
+int receive_supervision_plot(int fd, unsigned char *received_plot, int flag) {
     //unsigned char *received_plot = (unsigned char*)malloc(MAX_SIZE * sizeof(unsigned char));
 
     int state = START_STATE;
     while (state != STOP_STATE)
     {
-        if (alarm_flag == 1)
+        if (flag == TRANSMITTER && alarm_flag == 1)
         {
             printf("Receiving error at retransmission number %d\n", counter - 1);
-            break;
+            return 1;
         }
         read(fd, &received_plot[state], 1); /* returns after 5 chars have been input */
         switch (state)

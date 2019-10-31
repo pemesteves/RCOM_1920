@@ -13,7 +13,7 @@ int llread(int fd, char * buffer);
 int llclose(int fd, struct termios *oldtio, int flag);
 
 /* Serial port setup functions */
-int open_serial_port(const char* port);
+int open_serial_port(char* port);
 int close_serial_port(int fd, struct termios *oldtio);
 int save_current_termios(int fd, struct termios *oldtio);
 int set_new_termios(int fd, struct termios *newtio, int flag);
@@ -27,7 +27,7 @@ void byte_destuffing(unsigned char** string, int *length);
 /* Supervision plot functions */
 unsigned char* create_supervision_plot(char control_field);
 int send_supervision_plot(int fd, char control_field);
-int receive_supervision_plot(int fd, unsigned char *received_plot);
+int receive_supervision_plot(int fd, unsigned char *received_plot, int flag);
 
 /* Information plot functions */
 void create_information_plot(char control_field, char *data, int length, unsigned char* plot);
