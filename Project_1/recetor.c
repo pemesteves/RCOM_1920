@@ -28,6 +28,7 @@ int main(int argc, char** argv)
   int fd;
   struct termios oldtio, newtio;
 
+	//Opens the communication protocol
   if((fd = llopen(argv[1], RECEIVER, &oldtio)) < 0){
     printf("\nError in llopen\n");
     return -1;
@@ -39,24 +40,22 @@ int main(int argc, char** argv)
   bool received_end_packet = false;
   bool received_start_packet = false;
 
+  //Loop where the data will be received from the serial port
   for(;;){
     unsigned char data[256];
     int data_size = 0;
 
+    //Reads packet from the serial port
     if((data_size = llread(fd, data)) < 0){
       printf("\nError in llread\n");
       return -1;
     }
-/*
-    printf("\nMessage received: ");
-    for(int i = 0; i < data_size; i++) {
-      printf("%c", data[i]);
-    }
-*/
 
+    //There are 3 types of packets: the start and end control packets and the data packet
     switch(data[0]) {
       case DATA: // Data packet
       {
+        //It can only receive a data packet if it receives the start control packet
         if(!received_start_packet){
           printf("First packet received should be the start control packet\n\n");
           return -1;
@@ -64,10 +63,14 @@ int main(int argc, char** argv)
 
         unsigned char *content;
         unsigned int content_size;
+
+        //Parses the data packet
         if(parse_data_packet(data, &content, &content_size) < 0){
           printf("Can't parse the data packet\n\n");
           return -1;
         }
+
+        //Writes the content from the data packet to the created file
         if(write_file(file.fd, content, content_size) < 0){
           printf("Can't write in the new file\n\n");
           return -1;
@@ -78,6 +81,7 @@ int main(int argc, char** argv)
 
       case START: // Start control packet
       {
+        //Parses the start control packet
         if(parse_control_packet(data, data_size, &file) < 0){
           printf("Can't parse the starting control packet\n\n");
           return -1;
@@ -85,6 +89,7 @@ int main(int argc, char** argv)
         printf("File size: %ld \n\n", file.file_size);
         printf("FILENAME: %s\n", file.file_name);
 
+        //Creates the file where the data will be stored
         if(create_file(&file) < 0){
           printf("Can't open the new file\n\n");
           return -1;
@@ -95,22 +100,27 @@ int main(int argc, char** argv)
 
       case END: // End control packet
       {
-        if(!received_start_packet){
+        //It can only receive a end control packet if it receives the start control packet
+         if(!received_start_packet){
           printf("First packet received should be the start control packet\n\n");
           return -1;
         }
 
         applicationLayerFile new_file_data;
 
+        //Parses the end control packet
         if(parse_control_packet(data, data_size, &new_file_data) < 0){
           printf("Can't parse the starting control packet\n\n");
           return -1;
         }
 
+        //Checks if the new file name is equal to the file name that was received in the start control packet
         if(strcmp(new_file_data.file_name, file.file_name) != 0){
           printf("Received wrong file name\n\n");
           return -1;
         }
+
+        //Checks if the new file size is equal to the file size that was received in the start control packet
         if(new_file_data.file_size != file.file_size){
           printf("NEW FILE SIZE: %ld\n", new_file_data.file_size);
           printf("OLD FILE SIZE: %ld\n", file.file_size);
@@ -118,17 +128,21 @@ int main(int argc, char** argv)
           return -1;
         }
         
+        //Gets the real file size
         if(get_file_size(&file) < 0){
           printf("Error in the get_file_size function\n\n");
           return -1;
         }
         
+        //Checks if the file has the expected size
         if(file.file_size != new_file_data.file_size){
           printf("EXPECTED FILE SIZE: %ld\n", new_file_data.file_size);
           printf("REAL FILE SIZE: %ld\n", file.file_size);
           printf("File size is different than expected\n\n");
           return -1;
         }
+
+        //Closes the file and exits the reading loop
         if(close_file(file.fd) < 0){
           printf("Can't close file\n\n");
           return -1;
@@ -147,6 +161,7 @@ int main(int argc, char** argv)
 
   free(file.file_name);
 
+  //Closes the communication protocol
   if(llclose(fd, &oldtio, RECEIVER)){
 		printf("\nllclose error\n");
     return -1;
