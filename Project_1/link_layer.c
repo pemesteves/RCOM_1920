@@ -134,7 +134,7 @@ int llwrite(int fd, char *buffer, int length)
     int plot_length = length + 6;
     unsigned char *plot = malloc(plot_length * sizeof(char));
     create_information_plot(sender_field, buffer, length, plot);
-
+    
     // Stuffs it
     byte_stuffing(&plot, &plot_length);
 
@@ -144,8 +144,7 @@ int llwrite(int fd, char *buffer, int length)
 
     while(sending) {
         reset_alarm();
-
-        while(counter > 4) {
+        while(counter < 4) {
             printf("Transmission number %d\n", counter);
             if (alarm_flag) {
                 alarm(timeout);
@@ -164,7 +163,7 @@ int llwrite(int fd, char *buffer, int length)
             if(check_control_field(received_plot, receiver_ready_field))
                 continue;
 
-            sending = true;
+            sending = false;
             break;
         }
         if(counter >= 4){
@@ -178,7 +177,7 @@ int llwrite(int fd, char *buffer, int length)
     alarm(0);
     (void)signal(SIGALRM, sigalrm_handler);
 
-    update_trans_nums();
+    update_transm_nums();
 
     return size_written;
 }
