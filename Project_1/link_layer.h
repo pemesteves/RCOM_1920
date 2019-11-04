@@ -37,8 +37,13 @@ int receive_information_plot(int fd, unsigned char *received_plot, int *received
 /* Control field functions */
 bool check_control_field(unsigned char *plot, unsigned char control_field);
 bool valid_control_field(unsigned char control_field);
+void update_transm_nums();
 
 /* Retrieval functions */
 unsigned char* retrieve_data(unsigned char *information_plot, int plot_length, int *data_length);
 unsigned char retrieve_bcc2(unsigned char *information_plot, int plot_length);
 unsigned char calculate_bcc2(unsigned char *data, int data_length);
+
+/* Alarm funcions */
+void atende(int signal);
+void reset_alarm();
