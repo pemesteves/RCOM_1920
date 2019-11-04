@@ -95,21 +95,12 @@ int llopen(char *gate, int flag, struct termios *oldtio)
 
         while(!connected) {
             receive_supervision_plot(fd, received_plot, flag);
-<<<<<<< HEAD
-            
-            if(check_control_field(received_plot, C_SET))
-                break;
-            
-            send_supervision_plot(fd, C_UA);
-            
-=======
 
             if(check_control_field(received_plot, C_SET))
                 continue;
 
             send_supervision_plot(fd, C_UA);
 
->>>>>>> dd829da44fbe0e6b7baa7ff90c5af43b82cf7795
             connected = true;
         }
 
