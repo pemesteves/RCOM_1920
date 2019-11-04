@@ -10,50 +10,14 @@
 #include <signal.h>
 #include <stdbool.h>
 
-#define BAUDRATE B38400
-#define MODEMDEVICE "/dev/ttyS1"
-#define _POSIX_SOURCE 1 /* POSIX compliant source */
-#define FALSE 0
-#define TRUE 1
-
-#define MAX_REJECTS 3
-#define BIT(n) 1 << n
-
-#define FLAG        0x7e
-#define ESCAPE      0x7D
-#define A           0x03
-#define C_SET       0x03
-#define C_DISC      0x0B
-#define C_UA        0x07
-#define C_RR        0x05
-#define C_SEND_0    0x00
-#define C_SEND_1    0x40
-#define C_RR_0      0x05
-#define C_RR_1      0x85
-#define C_REJ_0     0x01
-#define C_REJ_1     0x81
-
 int alarm_flag = 1, counter = 1;
+unsigned int timeout = 3;
 
 unsigned char sender_field = C_SEND_0;
 unsigned char receiver_ready_field = C_RR_1;
 unsigned char receiver_reject_field = C_REJ_1;
 
-unsigned int timeout = 3;
-
 int information_plot_counter = 1;
-
-/**
- * Signal Handler for SIGALRM
- */
-void atende(int signal);
-
-/**
- * Update sender and receiver numbers
- */
-void update_transm_nums();
-
-
 
 
 
@@ -118,10 +82,10 @@ int llopen(char *gate, int flag, struct termios *oldtio)
             send_supervision_plot(fd, C_SET);
 
             if(receive_supervision_plot(fd, received_plot, flag))
-                break;
+                continue;
 
             if(check_control_field(received_plot, C_UA))
-                break;
+                continue;
 
             connected = true;
         }
@@ -130,14 +94,13 @@ int llopen(char *gate, int flag, struct termios *oldtio)
     case RECEIVER:
 
         while(!connected) {
-            printf("ola\n");
             receive_supervision_plot(fd, received_plot, flag);
-            printf("ola1\n");
+
             if(check_control_field(received_plot, C_SET))
-                break;
-            printf("ola2\n");
+                continue;
+
             send_supervision_plot(fd, C_UA);
-            printf("ola3\n");
+
             connected = true;
         }
 
@@ -164,135 +127,58 @@ int llwrite(int fd, char *buffer, int length)
     }
     printf("Sender: %x; receiver: %x\n", sender_field, receiver_ready_field);
 
+    // Install the alarm handler
     void *sigalrm_handler = signal(SIGALRM, atende);
 
+    // Creates the information plot
     int plot_length = length + 6;
     unsigned char *plot = malloc(plot_length * sizeof(char));
-
     create_information_plot(sender_field, buffer, length, plot);
 
+    // Stuffs it
     byte_stuffing(&plot, &plot_length);
 
     int size_written;
-    unsigned char received_char;
-    int state = 0;
-    unsigned reject_counter = 0;
+    unsigned char *received_plot = malloc(5 * sizeof(char));
+    bool sending = true;
 
-    do
-    {
-        alarm_flag = 1;
-        counter = 0;
-        state = 0;
-        alarm(0);
-        received_char = 0xFF;
+    while(sending) {
+        reset_alarm();
 
-        while (counter < 4 && state < 5)
-        {
+        while(counter > 4) {
             printf("Transmission number %d\n", counter);
-            if (alarm_flag)
-            {
+            if (alarm_flag) {
                 alarm(timeout);
                 printf("Set alarm!\n\n");
                 alarm_flag = 0;
             }
 
-            if ((size_written = write(fd, plot,  plot_length)) < 0)
-            {
+            if ((size_written = write(fd, plot,  plot_length)) < 0) {
                 perror("write");
                 return -1;
             }
+            
+            if(receive_supervision_plot(fd, received_plot, TRANSMITTER))
+                continue;
 
-            printf("Plot written: ");
-            for(int i = 0; i < plot_length; i++){
-                printf("%x ", plot[i]);
-            }
-            printf("\n\n");
+            if(check_control_field(received_plot, receiver_ready_field))
+                continue;
 
-            printf("%d bytes written.\n", size_written);
-
-            unsigned char RR[5];
-
-            state = 0;
-
-            while (state != 5) /* loop for input */
-            {
-                if (alarm_flag == 1)
-                {
-                    printf("Receiving error at retransmission number %d\n", counter - 1);
-                    break;
-                }
-
-                if(read(fd, &RR[state], 1)<0){ /* returns after 5 chars have been input */
-                    perror("read");
-                }
-
-                switch (state)
-                {
-                case 0:
-                    if (RR[state] == FLAG)
-                        state = 1;
-                    break;
-                case 1:
-                    if (RR[state] == A)
-                        state = 2;
-                    else if (RR[state] == FLAG)
-                        state = 1;
-                    else
-                        state = 0;
-                    break;
-                case 2:
-                    if (RR[state] == receiver_ready_field)
-                    {
-                        received_char = receiver_ready_field;
-                        printf("Received Receiver Ready\n\n");
-                        state = 3;
-                    }
-                    else if (RR[state] == FLAG)
-                        state = 1;
-                    else //Error in transmission: receiver asked for the same plot
-                    {
-                        received_char = receiver_reject_field;
-                        printf("Received Receiver Reject\n\n");
-                        reject_counter++;
-                        if(reject_counter >= MAX_REJECTS){
-                            free(plot);
-
-                            alarm(0);
-                            (void)signal(SIGALRM, sigalrm_handler);
-                            return -1;
-                        }
-                        state = 3;
-                    }
-                    break;
-                case 3:
-                    if (RR[state] == received_char ^ A)
-                        state = 4;
-                    else
-                        state = 0;
-                    break;
-                case 4:
-                    if (RR[state] == FLAG)
-                        state = 5;
-                    else
-                        state = 0;
-                    break;
-                default:
-                    break;
-                }
-            }
+            sending = true;
+            break;
         }
         if(counter >= 4){
           printf("Can't transmit plot.\n\n");
           return -1;
         }
-    } while (received_char != receiver_ready_field);
 
+    }
     free(plot);
 
     alarm(0);
     (void)signal(SIGALRM, sigalrm_handler);
 
-    update_transm_nums();
+    update_trans_nums();
 
     return size_written;
 }
@@ -354,196 +240,55 @@ int llread(int fd, char *buffer)
 
 int llclose(int fd, struct termios *oldtio, int flag)
 {
-    int state = 0;
-    if (flag == TRANSMITTER)
-    {
-        unsigned char SET[5]; //[FLAG, A, C_DISC, BCC, FLAG]
+    bool disconnected = false;
+    unsigned char *received_plot = (unsigned char *)malloc(255 * sizeof(unsigned char));
 
-        while (state < 5)
-        {
-            SET[0] = FLAG;
-            SET[1] = A;
-            SET[2] = C_DISC;
-            SET[3] = SET[1] ^ SET[2]; //BCC
-            SET[4] = FLAG;
+    switch(flag) {
+        case TRANSMITTER:
+            while(!disconnected) {
 
-            int size_written;
-            //Send DISC
-            if ((size_written = write(fd, SET, 5)) < 0)
-            {
-                perror("write");
-                return -1;
+                send_supervision_plot(fd, C_DISC);
+
+                if(receive_supervision_plot(fd, received_plot, flag))
+                    continue;
+                if(check_control_field(received_plot, C_DISC))
+                    continue;
+
+                disconnected = true;
             }
 
-            printf("%d bytes written: ", size_written);
-            printf("%x %x %x %x %x\n", SET[0], SET[1], SET[2], SET[3], SET[4]);
+            send_supervision_plot(fd, C_UA);
 
-            memset(SET, '\0', sizeof(SET));
+            break;
 
-            state = 0;
-            //Receive DISC
-            while (state != 5) /* loop for input */
-            {
+        case RECEIVER:
+            while(!disconnected) {
+                
+                if(receive_supervision_plot(fd, received_plot, flag))
+                    continue;
+                if(check_control_field(received_plot, C_DISC))
+                    continue;
 
-                read(fd, &SET[state], 1); /* returns after 5 chars have been input */
-                switch (state)
-                {
-                case 0:
-                    if (SET[state] == FLAG)
-                        state = 1;
-                    break;
-                case 1:
-                    if (SET[state] == A)
-                        state = 2;
-                    else if (SET[state] == FLAG)
-                        state = 1;
-                    else
-                        state = 0;
-                    break;
-                case 2:
-                    if (SET[state] == C_DISC)
-                        state = 3;
-                    else if (SET[state] == FLAG)
-                        state = 1;
-                    else
-                        state = 0;
-                    break;
-                case 3:
-                    if (SET[state] == C_DISC ^ A)
-                        state = 4;
-                    else
-                        state = 0;
-                    break;
-                case 4:
-                    if (SET[state] == FLAG)
-                        state = 5;
-                    else
-                        state = 0;
-                    break;
-                default:
-                    break;
-                }
+                disconnected = true;
             }
-        }
 
-        //Send UA
-        SET[0] = FLAG;
-        SET[1] = A;
-        SET[2] = C_UA;
-        SET[3] = SET[1] ^ SET[2]; //BCC
-        SET[4] = FLAG;
+            bool acknowledged = false;
+            while(!acknowledged) {
+                
+                send_supervision_plot(fd, C_DISC);
 
-        int size_written;
-        if ((size_written = write(fd, SET, 5)) < 0)
-        {
-            perror("write");
-            return -1;
-        }
+                if(receive_supervision_plot(fd, received_plot, flag))
+                    continue;
+                if(check_control_field(received_plot, C_UA))
+                    continue;
+
+                acknowledged = true;
+            }
+
+            break;        
     }
-    else
-    {
-        char buf[255];
-        //Receive DISC
-        while (state != 5)
-        {                             /* loop for input */
-            read(fd, &buf[state], 1); /* returns after 5 chars have been input */
-            switch (state)
-            {
-            case 0:
-                if (buf[state] == FLAG)
-                    state = 1;
-                break;
-            case 1:
-                if (buf[state] == A)
-                    state = 2;
-                else if (buf[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-            case 2:
-                if (buf[state] == C_DISC)
-                    state = 3;
-                else if (buf[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-            case 3:
-                if (buf[state] == C_DISC ^ A)
-                    state = 4;
-                else
-                    state = 0;
-                break;
-            case 4:
-                if (buf[state] == FLAG)
-                    state = 5;
-                else
-                    state = 0;
-                break;
-            default:
-                break;
-            }
-        }
-
-        unsigned char DISC[5];
-
-        DISC[0] = FLAG;
-        DISC[1] = A;
-        DISC[2] = C_DISC;
-        DISC[3] = DISC[1] ^ DISC[2]; //BCC1
-        DISC[4] = FLAG;
-
-        //Send DISC
-        int size_written = write(fd, DISC, 5);
-        printf("%d bytes written: ", size_written);
-        printf("%x %x %x %x %x\n", DISC[0], DISC[1], DISC[2], DISC[3], DISC[4]);
-
-        state = 0;
-        //Receive UA
-        while (state != 5)
-        {                             /* loop for input */
-            read(fd, &buf[state], 1); /* returns after 5 chars have been input */
-            switch (state)
-            {
-            case 0:
-                if (buf[state] == FLAG)
-                    state = 1;
-                break;
-            case 1:
-                if (buf[state] == A)
-                    state = 2;
-                else if (buf[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-            case 2:
-                if (buf[state] == C_UA)
-                    state = 3;
-                else if (buf[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-            case 3:
-                if (buf[state] == C_UA ^ A)
-                    state = 4;
-                else
-                    state = 0;
-                break;
-            case 4:
-                if (buf[state] == FLAG)
-                    state = 5;
-                else
-                    state = 0;
-                break;
-            default:
-                break;
-            }
-        }
-    }
-
+    free(received_plot);
+    
     if(flag == TRANSMITTER)
         sleep(2);
 
@@ -556,28 +301,7 @@ int llclose(int fd, struct termios *oldtio, int flag)
     printf("\nOld termios structure set at llclose\n");
 
     close(fd);
-    return 0;
-}
-
-void atende(int signal)
-{
-    printf("alarme # %d\n", counter);
-    alarm_flag = 1;
-    counter++;
-}
-
-void update_transm_nums() {
-    if(sender_field == C_SEND_0) {
-        sender_field = C_SEND_1;
-        receiver_ready_field = C_RR_0;
-        receiver_reject_field = C_REJ_0;
-    }
-    else
-    {
-        sender_field = C_SEND_0;
-        receiver_ready_field = C_RR_1;
-        receiver_reject_field = C_REJ_1;
-    }
+    return 0;   
 }
 
 
@@ -862,6 +586,19 @@ bool valid_control_field(unsigned char control_field) {
     return 0;
 }
 
+void update_transm_nums() {
+    if(sender_field == C_SEND_0) {
+        sender_field = C_SEND_1;
+        receiver_ready_field = C_RR_0;
+        receiver_reject_field = C_REJ_0;
+    }
+    else
+    {
+        sender_field = C_SEND_0;
+        receiver_ready_field = C_RR_1;
+        receiver_reject_field = C_REJ_1;
+    }
+}
 
 
 /****************************/
@@ -973,4 +710,25 @@ int check_serial_port(char *port) {
             return -1;
 
     return 0;
+}
+
+
+
+/****************************/
+/**                        **/
+/**    Alarm Functions     **/
+/**                        **/
+/****************************/
+
+void atende(int signal)
+{
+    printf("alarme # %d\n", counter);
+    alarm_flag = 1;
+    counter++;
+}
+
+void reset_alarm() {
+    alarm_flag = 1;
+    counter = 0;
+    alarm(0); 
 }
