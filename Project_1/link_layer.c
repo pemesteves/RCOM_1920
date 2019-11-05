@@ -75,7 +75,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
             
             printf("Transmission number %d\n", counter);
             if(alarm_flag) {
-                alarm(newtio.c_cc[VTIME]);
+                alarm(timeout);
                 alarm_flag = 0;
             }
 
