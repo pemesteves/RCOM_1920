@@ -16,7 +16,7 @@ int sequence_number = 0;
  * 
  * @return Returns the reversed string
  */
-unsigned char *strrev(unsigned char *str);
+unsigned char *strrev(unsigned char *str, int length);
 
 
 int create_data_packet(int data_length, char * data, unsigned char * packet) {
@@ -54,22 +54,22 @@ int create_control_packet(applicationLayerFile *file, char control, char * packe
 
         //Creating the L and V field of the file size -> off_t variable is a 64 bit integer
         off_t v1_file_size = file->file_size; 
-        
+
         int v1_length = 0;
-        char* v1 = NULL;
+        unsigned char* v1 = NULL;
         do{
             v1_length++;
             v1 = realloc(v1, v1_length); //Reallocating memory to v field of the file size
             v1[v1_length-1] = (unsigned char)v1_file_size%256; //We'll have the most significant bits of the length on the right
-
+            
             off_t offset = v1_file_size/256;
             if(offset == 0)
                 break;
             v1_file_size = offset;
         }while(1);
 
-        v1 = strrev(v1); //Reverse length so that the most significant bits are on the left like it's supposed to be
-        
+        strrev(v1, v1_length); //Reverse length so that the most significant bits are on the left like it's supposed to be
+
         //Copying the file size TLV to the packet
         packet[2] = v1_length; 
         *packet_size += v1_length; //Packet size will increase v1_length
@@ -170,13 +170,13 @@ int parse_control_packet(unsigned char *packet, unsigned int packet_size, applic
     return 0;
 }
 
-unsigned char *strrev(unsigned char *str)
+unsigned char *strrev(unsigned char *str, int length)
 {
       char *p1, *p2;
 
       if (! str || ! *str)
             return str;
-      for (p1 = str, p2 = str + strlen(str) - 1; p2 > p1; ++p1, --p2)
+      for (p1 = str, p2 = str + length - 1; p2 > p1; ++p1, --p2)
       {
             *p1 ^= *p2;
             *p2 ^= *p1;
@@ -184,5 +184,3 @@ unsigned char *strrev(unsigned char *str)
       }
       return str;
 }
-
-
