@@ -28,7 +28,7 @@ void byte_destuffing(unsigned char** string, int *length);
 /* Supervision plot functions */
 unsigned char* create_supervision_plot(char control_field);
 int send_supervision_plot(int fd, char control_field);
-int receive_supervision_plot(int fd, unsigned char *received_plot, int flag);
+int receive_supervision_plot(int fd, unsigned char *received_plot, int flag, unsigned char expected_field);
 
 /* Information plot functions */
 void create_information_plot(char control_field, char *data, int length, unsigned char* plot);
@@ -47,3 +47,4 @@ unsigned char calculate_bcc2(unsigned char *data, int data_length);
 /* Alarm funcions */
 void atende(int signal);
 void reset_alarm();
+
