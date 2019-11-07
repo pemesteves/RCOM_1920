@@ -1,5 +1,3 @@
-/*Non-Canonical Input Processing*/
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -37,6 +35,10 @@ int main(int argc, char** argv)
   char *content;
   applicationLayerFile file;
 
+  // Variables for progress display
+  off_t current_file_size = 0;
+  off_t full_file_size = 0;
+
   bool received_end_packet = false;
   bool received_start_packet = false;
 
@@ -70,6 +72,9 @@ int main(int argc, char** argv)
           return -1;
         }
 
+	current_file_size += (off_t) content_size;
+        printf("\n%02x / %02x bytes transfered\n", current_file_size, full_file_size);
+
         //Writes the content from the data packet to the created file
         if(write_file(file.fd, content, content_size) < 0){
           printf("Can't write in the new file\n\n");
@@ -87,7 +92,9 @@ int main(int argc, char** argv)
           return -1;
         }
         printf("File size: %ld \n\n", file.file_size);
-        printf("FILENAME: %s\n", file.file_name);
+        printf("File name: %s\n", file.file_name);
+
+        full_file_size = file.file_size;
 
         //Creates the file where the data will be stored
         if(create_file(&file) < 0){
@@ -122,8 +129,8 @@ int main(int argc, char** argv)
 
         //Checks if the new file size is equal to the file size that was received in the start control packet
         if(new_file_data.file_size != file.file_size){
-          printf("NEW FILE SIZE: %ld\n", new_file_data.file_size);
-          printf("OLD FILE SIZE: %ld\n", file.file_size);
+          printf("New file size: %ld\n", new_file_data.file_size);
+          printf("Old file size: %ld\n", file.file_size);
           printf("Received wrong file size\n\n");
           return -1;
         }
