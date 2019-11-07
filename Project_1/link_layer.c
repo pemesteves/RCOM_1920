@@ -58,7 +58,7 @@ int llopen(char *gate, int flag, struct termios *oldtio)
     
     void* sigalrm_handler;
     if(flag == TRANSMITTER){
-        sigalrm_handler = signal(SIGALRM, atende);  // instala  rotina que atende interrupcao
+        sigalrm_handler = signal(SIGALRM, atende);  // Install the alarm handler
     }
 
     bool connected = false;
@@ -119,12 +119,6 @@ int llopen(char *gate, int flag, struct termios *oldtio)
 
 int llwrite(int fd, char *buffer, int length)
 {
-    // REMOVER depois porque a app_player nunca permitirá isto
-    if (length <= 0)
-    {
-        write(stderr, "Length must be positive!\n", 26);
-        return -1;
-    }
     printf("Sender: %x; receiver: %x\n", sender_field, receiver_ready_field);
 
     // Install the alarm handler
@@ -367,8 +361,7 @@ void byte_destuffing(unsigned char** string, int *length){
             new_string[j] = (*string)[i];
         }
     }
-    //new_string = realloc(new_string, new_length);
-    //string = realloc(string, new_length);
+    
     memcpy(*string, new_string, new_length);
 
     *length = new_length;

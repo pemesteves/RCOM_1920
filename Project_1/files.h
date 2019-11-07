@@ -34,7 +34,7 @@ int get_file_size(applicationLayerFile *file);
  * 
  * @return Returns -1 if there was an error. Otherwise returns 0
  */
-int open_file(applicationLayerFile *file);//char* file_name);
+int open_file(applicationLayerFile *file);
 
 /**
  * @brief Function that reads length bytes from a file
@@ -63,7 +63,7 @@ int close_file(int fd);
  * 
  * @return Returns -1 if there was an error. Otherwise returns 0
  */
-int create_file(applicationLayerFile *file);//char* file_name);
+int create_file(applicationLayerFile *file);
 
 /**
  * @brief Function that writes content_size bytes in a file

@@ -125,8 +125,8 @@ int parse_data_packet(unsigned char *packet, unsigned char **content, unsigned i
     return 0;
 }
 
-int parse_control_packet(unsigned char *packet, unsigned int packet_size, applicationLayerFile *file){//char **file_name, off_t *file_size) {
-   
+int parse_control_packet(unsigned char *packet, unsigned int packet_size, applicationLayerFile *file){
+       
     //First byte of the packet is checked before this function has been called
    
     for (int i = 1; i < packet_size ; i++){

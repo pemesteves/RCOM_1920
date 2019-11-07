@@ -51,4 +51,4 @@ int parse_data_packet(unsigned char *packet, unsigned char **content, unsigned i
  *
  * @return Returns -1 if there was an error. Otherwise returns 0
  */
-int parse_control_packet(unsigned char *packet, unsigned int packet_size, applicationLayerFile *file); //char **file_name, off_t *file_size); 
+int parse_control_packet(unsigned char *packet, unsigned int packet_size, applicationLayerFile *file); 

@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <time.h>
 
 #include "link_layer.h"
 #include "app_layer.h"
@@ -19,6 +20,8 @@
 
 int main(int argc, char **argv)
 {
+	struct timespec start, end;
+
 	if (argc < 3)
 	{
 		printf("Emissor should have at least 3 parameters: ./emissor serial_port_path file_path\n\n");
@@ -99,6 +102,9 @@ int main(int argc, char **argv)
 
 	unsigned char *data_pkt;
 
+	//Get start time
+	clock_gettime(CLOCK_REALTIME, &start);
+
 	//Loop where the data will be read from the file and sent to the receiver
 	for (;;)
 	{
@@ -143,6 +149,10 @@ int main(int argc, char **argv)
 
 		free(data_pkt);
 	}
+
+	//Get final time
+	clock_gettime(CLOCK_REALTIME, &end);
+
 	free(data);
 
 	//Creates the end control packet
@@ -185,6 +195,8 @@ int main(int argc, char **argv)
 		printf("llclose error\n");
 		return -1;
 	}
+
+	printf("\nTIME: %f s\n\n", (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 10000000000.0);
 
 	return 0;
 }

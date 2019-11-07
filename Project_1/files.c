@@ -22,7 +22,7 @@ int get_file_size(applicationLayerFile *file){
     return 0;
 }
 
-int open_file(applicationLayerFile *file){//char* file_name){
+int open_file(applicationLayerFile *file){
     int fd = open(file->file_name, O_RDONLY); //Opens file for reading
     if(fd < 0){
         perror("open");
