@@ -13,4 +13,6 @@ typedef struct {
     content password;
     content host;
     content path;
-} URL
+    content ip;
+    int port;
+} URL;

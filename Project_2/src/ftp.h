@@ -8,3 +8,9 @@
 #include <signal.h>
 #include <netdb.h>
 #include <strings.h>
+
+typedef struct {
+    int socket_fd;
+} FTP;
+
+int ftp_connect_server(FTP* ftp, const char* ip, int port);
