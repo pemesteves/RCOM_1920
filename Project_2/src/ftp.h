@@ -24,4 +24,4 @@ typedef struct {
 
 int ftp_connect_server(FTP* ftp, const char* ip, int port);
 
-int ftp_server_reply(FTP* ftp, char* reply);
+int ftp_server_reply(FTP* ftp, char** reply);

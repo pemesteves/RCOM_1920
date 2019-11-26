@@ -25,3 +25,7 @@ int ftp_connect_server(FTP* ftp, const char* ip, int port) {
 
     ftp->socket_fd = sockfd;
 }
+
+int ftp_server_reply(FTP* ftp, char** reply) {
+
+}
