@@ -16,3 +16,5 @@ typedef struct {
     content ip;
     int port;
 } URL;
+
+int parseURL(char* url, URL *parsed_url);
