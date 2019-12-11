@@ -1,6 +1,10 @@
 #include "url.h"
 
 #include <string.h>
+#include <netinet/in.h> 
+#include <arpa/inet.h>
+#include <netdb.h> 
+#include <sys/types.h>
 
 int parseURL(char* url, URL *parsed_url){
     if(strstr(url, "ftp://") == NULL){
@@ -81,6 +85,23 @@ int parseURL(char* url, URL *parsed_url){
         printf("Error parsing the path ! \n\n");
         return -1;
     }
+
+	struct hostent *host;
+    
+    if((host = gethostbyname(parsed_url->host)) == NULL){
+        perror("gethostbyname");
+        return -1;
+    }
+
+    //Get IP address from host
+    char* ip = inet_ntoa(*((struct in_addr *)host->h_addr));
+    
+    if(strcpy(parsed_url->ip, ip) == NULL){
+        printf("Error copying the IP address ! \n\n");
+        return -1;
+    }
+
+    parsed_url->port = 6000;
 
     return 0;
 }
