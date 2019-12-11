@@ -74,7 +74,7 @@ int parseURL(char* url, URL *parsed_url){
         }
     }
 
-    parsed_url->path[0] = '\0';
+    bzero(parsed_url->path, 256*sizeof(char));
 
     //Copying the path 
     if(strncpy(parsed_url->path, path, last_slash) == NULL){
@@ -82,6 +82,7 @@ int parseURL(char* url, URL *parsed_url){
         return -1;
     }
 
+    bzero(parsed_url->filename, 256*sizeof(char));
 
     //Copying the filename 
     if(strncpy(parsed_url->filename, path + last_slash, strlen(path) - last_slash + 1) == NULL){
