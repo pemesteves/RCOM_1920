@@ -27,8 +27,8 @@ int ftp_create_socket(int* socket_fd, const char* ip, int port) {
 	return 0;
 }
 
-int ftp_connect_server(FTP* ftp, const char* ip, int port) {
-    if(ftp_create_socket(&(ftp->socket_fd), ip, port) < 0)
+int ftp_connect_server(FTP* ftp) {
+    if(ftp_create_socket(&(ftp->socket_fd), ftp->url.ip, ftp->url.port) < 0)
 		return -1; 
 
 	int reply_code = ftp_server_reply(ftp, NULL);
@@ -54,9 +54,14 @@ int ftp_connect_server(FTP* ftp, const char* ip, int port) {
 	}
 }
 
+void ftp_close_server(FTP* ftp) {
+	close(ftp->socket_fd);
+	close(ftp->data_socket_fd);
+}
+
 int ftp_command(FTP* ftp, const char* cmd, const char* arg, char* reply) {
 	
-	char* buffer[1024];
+	char buffer[1024];
 
 	sprintf(buffer, "%s %s\r\n", cmd, cmd);
 	write(ftp->socket_fd, buffer, strlen(buffer));
@@ -209,7 +214,7 @@ int ftp_retr_command(FTP* ftp, char* reply) {
 	}
 	fclose(file);
 
-	int reply_code = ftp_command(ftp, "RETR", ftp->url.filename, reply);
+	reply_code = ftp_command(ftp, "RETR", ftp->url.filename, reply);
 	switch(reply_code) {
 		case FILE_ACTION_OK:
 			printf("Download completed\n");
