@@ -50,7 +50,7 @@ int ftp_connect_server(FTP* ftp) {
 
 		default:
 			printf("Unable to connect\n");
-			break;
+			return -1;
 	}
 }
 
@@ -63,7 +63,7 @@ int ftp_command(FTP* ftp, const char* cmd, const char* arg, char* reply) {
 	
 	char buffer[1024];
 
-	sprintf(buffer, "%s %s\r\n", cmd, cmd);
+	sprintf(buffer, "%s %s\r\n", cmd, arg);
 	write(ftp->socket_fd, buffer, strlen(buffer));
 
 	return ftp_server_reply(ftp, reply);
@@ -76,7 +76,8 @@ int ftp_server_reply(FTP* ftp, char* reply) {
 
 	// buffers
 	char buffer[2048];
-	char reply_code[3];
+	char reply_code[4];
+	reply_code[3] = '\0';
 
 	// reads the reply code
 	read(ftp->socket_fd, reply_code, 3);
@@ -119,20 +120,20 @@ int ftp_server_reply(FTP* ftp, char* reply) {
 	return atoi(reply_code);
 }
 
-int ftp_usr_command(FTP* ftp, char* reply) {
+int ftp_user_command(FTP* ftp, char* reply) {
 	int reply_code = ftp_command(ftp, "USER", ftp->url.user, reply);
 
 	switch(reply_code) {
 		case PASSWORD_NEEDED:
-			printf("User name okay, need password\n");
+			printf("User name okay, need password.\n\t%d - %s\n", reply_code, reply);
 			return 0;
 
 		case USER_LOGGED:
-			printf("User logged in\n");
+			printf("User logged in.\n");
 			return 1;
 
 		default:
-			printf("Unexpected reply code\n");
+			printf("Unexpected reply code.\n\t%d - %s\n", reply_code, reply);
 			return -1;
 	}
 }
@@ -142,20 +143,35 @@ int ftp_pass_command(FTP* ftp, char* reply) {
 
 	switch(reply_code) {
 		case USER_LOGGED:
-			printf("User logged in\n");
+			printf("User logged in.\n");
 			return 0;
 
+		case NOT_LOGGED_IN:
+			printf("Not logged in.\n\t%d - %s\n", reply_code, reply);
+			return -2;
+
+		case BAD_SEQUENCE:
+			printf("Bad sequence of commands.\n\t%d - %s\n", reply_code, reply);
+			return -1;
+
 		default:
-			printf("Unexpected reply code\n");
+			printf("Unexpected reply code.\n\t%d - %s\n", reply_code, reply);
 			return -1;
 	}
 }
 
 int ftp_cwd_command(FTP* ftp, char* reply) {
+	if(strlen(ftp->url.path)==0) {
+		printf("Already at correct directory\n");
+		return 0;
+	}
+		
 	int reply_code = ftp_command(ftp, "CWD", ftp->url.path, reply);
 
+	printf("DIRECTORY: %s\n\n", ftp->url.path);
+
 	if(reply_code != FILE_ACTION_OK) {
-		printf("Unexcpected reply code. Probably a wrong directory\n");
+		printf("Unexpected reply code. Probably a wrong directory\n");
 		return -1;
 	}
 
@@ -166,8 +182,9 @@ int ftp_cwd_command(FTP* ftp, char* reply) {
 int ftp_pasv_command(FTP* ftp, char* reply) {
 	int reply_code = ftp_command(ftp, "PASV", "", reply);
 
+	char* ip_start = strchr(reply, '(') + 1;
 	int ip1, ip2, ip3, ip4, gate1, gate2;
-	sscanf(reply, "%d,%d,%d,%d,%d,%d", &ip1, &ip2, &ip3, &ip4, &gate1, &gate2);
+	sscanf(ip_start, "%d,%d,%d,%d,%d,%d", &ip1, &ip2, &ip3, &ip4, &gate1, &gate2);
 
 	// determines ip
 	char ip[16];

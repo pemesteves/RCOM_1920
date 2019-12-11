@@ -56,8 +56,8 @@ int parseURL(char* url, URL *parsed_url){
                 return -1;
             }
 
-            strcpy(parsed_url->user, "");
-            strcpy(parsed_url->password, "");
+            strcpy(parsed_url->user, "anonymous");
+            strcpy(parsed_url->password, "chourico");
 
         } else{
             printf("INPUT ERROR: The url should have a '/' separating the host from the url-path !\n\n");
@@ -74,11 +74,14 @@ int parseURL(char* url, URL *parsed_url){
         }
     }
 
+    parsed_url->path[0] = '\0';
+
     //Copying the path 
     if(strncpy(parsed_url->path, path, last_slash) == NULL){
         printf("Error parsing the path ! \n\n");
         return -1;
     }
+
 
     //Copying the filename 
     if(strncpy(parsed_url->filename, path + last_slash, strlen(path) - last_slash + 1) == NULL){
@@ -101,7 +104,11 @@ int parseURL(char* url, URL *parsed_url){
         return -1;
     }
 
-    parsed_url->port = 6000;
+    parsed_url->port = 21;
+
+    printf("URL\n\n\n");
+    printf("path: %s\n", parsed_url->path);
+    printf("strlen: %d\n\n", strlen(parsed_url->path));    
 
     return 0;
 }

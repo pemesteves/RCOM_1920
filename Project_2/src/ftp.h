@@ -22,6 +22,8 @@
 #define USER_LOGGED      230
 #define DIRECTORY_OK     257
 #define PASSWORD_NEEDED  331
+#define NOT_LOGGED_IN    530
+#define BAD_SEQUENCE     503
 
 typedef struct {
     int socket_fd;
@@ -37,7 +39,7 @@ int ftp_server_reply(FTP* ftp, char* reply);
 
 int ftp_command(FTP* ftp, const char* cmd, const char* arg, char* reply);
 
-int ftp_usr_command(FTP* ftp, char* reply);
+int ftp_user_command(FTP* ftp, char* reply);
 
 int ftp_pass_command(FTP* ftp, char* reply);
 

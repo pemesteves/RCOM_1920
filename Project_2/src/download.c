@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "ftp.h"
 
@@ -22,10 +23,15 @@ int main(int argc, char* argv[]) {
         exit(1);
 
     printf("\n# AUTHENTICATING USER\n");
-    if(ftp_usr_command(&ftp, buffer))
-        exit(2);
-    if(ftp_pass_command(&ftp, buffer))
-        exit(3);
+    printf("\tUser: %s\n", url.user);
+    printf("\tPass: %s\n\n", url.password);
+    if(url.user != "") {
+        if(ftp_user_command(&ftp, buffer))
+            exit(2);
+        bzero(buffer, strlen(buffer));
+        if(ftp_pass_command(&ftp, buffer))
+            exit(3);
+    }
 
     printf("\n# ENTERING PASSIVE MODE\n");
     if(ftp_pasv_command(&ftp, buffer))
