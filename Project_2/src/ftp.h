@@ -29,7 +29,9 @@ typedef struct {
     URL url;
 } FTP;
 
-int ftp_connect_server(FTP* ftp, const char* ip, int port);
+int ftp_connect_server(FTP* ftp);
+
+void ftp_close_server(FTP* ftp);
 
 int ftp_server_reply(FTP* ftp, char* reply);
 
@@ -40,3 +42,7 @@ int ftp_usr_command(FTP* ftp, char* reply);
 int ftp_pass_command(FTP* ftp, char* reply);
 
 int ftp_cwd_command(FTP* ftp, char* reply);
+
+int ftp_pasv_command(FTP* ftp, char* reply);
+
+int ftp_retr_command(FTP* ftp, char* reply);
