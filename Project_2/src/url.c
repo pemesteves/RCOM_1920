@@ -49,8 +49,8 @@ int parseURL(char* url, URL *parsed_url){
                 return -1;
             }
 
-            strcpy(parsed_url->host, "");
-            strcpy(parsed_url->path, "");
+            strcpy(parsed_url->user, "");
+            strcpy(parsed_url->password, "");
 
         } else{
             printf("INPUT ERROR: The url should have a '/' separating the host from the url-path !\n\n");

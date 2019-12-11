@@ -9,19 +9,34 @@
 #include <netdb.h>
 #include <strings.h>
 
+#include "url.h"
+
 // Server replies
-#define FILE_OK          "150"
-#define COMMAND_OK       "200"
-#define SERVER_READY     "220"
-#define CLOSE_CONNECTION "226"
-#define USER_LOGGED      "230"
-#define DIRECTORY_OK     "257"
-#define PASSWORD_NEEDED  "331"
+#define FILE_OK          150
+#define DATA_OPEN        125
+#define FILE_ACTION_OK   250
+#define COMMAND_OK       200
+#define SERVER_BUSY      120
+#define SERVER_READY     220
+#define CLOSE_CONNECTION 226
+#define USER_LOGGED      230
+#define DIRECTORY_OK     257
+#define PASSWORD_NEEDED  331
 
 typedef struct {
     int socket_fd;
+    int data_socket_fd;
+    URL url;
 } FTP;
 
 int ftp_connect_server(FTP* ftp, const char* ip, int port);
 
-int ftp_server_reply(FTP* ftp, char** reply);
+int ftp_server_reply(FTP* ftp, char* reply);
+
+int ftp_command(FTP* ftp, const char* cmd, const char* arg, char* reply);
+
+int ftp_usr_command(FTP* ftp, char* reply);
+
+int ftp_pass_command(FTP* ftp, char* reply);
+
+int ftp_cwd_command(FTP* ftp, char* reply);
